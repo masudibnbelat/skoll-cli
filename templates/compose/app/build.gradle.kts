@@ -1,3 +1,7 @@
+// Location: templates/compose/app/build.gradle.kts
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -8,10 +12,14 @@ plugins {
 // create a release keystore once (~/.angrboda/keystore/) and write
 // its path + passwords into local.properties (gitignored). Without
 // those four keys the release APK is built unsigned.
-val releaseKeystoreProps = java.util.Properties()
+// NOTE: do NOT use java.util.Properties() here — in a Gradle Kotlin
+// DSL script `java` resolves to the Java plugin extension, so
+// `java.util` fails with "Unresolved reference 'util'". Import the
+// class and use the simple name.
+val releaseKeystoreProps = Properties()
 val localPropsFile = rootProject.file("local.properties")
 if (localPropsFile.exists()) {
-    localPropsFile.inputStream().use { releaseKeystoreProps.load(it) }
+    releaseKeystoreProps.load(FileInputStream(localPropsFile))
 }
 val hasReleaseKey = listOf(
     "releaseStoreFile", "releaseStorePassword",
@@ -57,12 +65,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-
     buildFeatures {
         compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11
     }
 }
 

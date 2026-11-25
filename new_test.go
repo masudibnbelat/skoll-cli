@@ -1,3 +1,4 @@
+// Location: new_test.go
 package main
 
 import (

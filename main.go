@@ -1,3 +1,4 @@
+// Location: main.go
 package main
 
 // angrboda — one small CLI for any Android project.

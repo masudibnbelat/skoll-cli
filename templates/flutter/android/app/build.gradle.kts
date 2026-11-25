@@ -1,5 +1,10 @@
+// Location: templates/flutter/android/app/build.gradle.kts
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
+    id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -7,10 +12,14 @@ plugins {
 // Release signing: `angrboda build --release` / `angrboda release`
 // create a release keystore once and write android/key.properties
 // (gitignored). Without it the release APK is signed with the debug key.
-val keystoreProperties = java.util.Properties()
+// NOTE: do NOT use java.util.Properties() here — in a Gradle Kotlin
+// DSL script `java` resolves to the Java plugin extension, so
+// `java.util` fails with "Unresolved reference 'util'". Import the
+// class and use the simple name, exactly like Flutter's own template.
+val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 val hasReleaseKey = keystorePropertiesFile.exists() &&
     keystoreProperties.getProperty("storeFile") != null

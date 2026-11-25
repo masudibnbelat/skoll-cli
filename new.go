@@ -1,3 +1,4 @@
+// Location: new.go
 package main
 
 import (
