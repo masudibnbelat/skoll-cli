@@ -32,6 +32,28 @@ func TestCopyExecutable(t *testing.T) {
 	if _, err := os.Stat(src); !os.IsNotExist(err) {
 		t.Fatalf("src still exists after copyExecutable")
 	}
+
+	// Overwriting an existing executable (the running-binary case:
+	// the old file is replaced by rename, never opened for writing).
+	if err := os.WriteFile(src, []byte("new version"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte("old version"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := copyExecutable(src, dst); err != nil {
+		t.Fatalf("copyExecutable over existing dst: %v", err)
+	}
+	got, err = os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new version" {
+		t.Fatalf("dst after overwrite = %q, want new version", got)
+	}
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Fatalf("src still exists after overwrite copyExecutable")
+	}
 }
 
 func TestMoveFileSameDevice(t *testing.T) {

@@ -184,28 +184,39 @@ func moveFile(src, dst string) error {
 	return copyExecutable(src, dst)
 }
 
-// copyExecutable copies src to dst with executable mode and removes
-// src. (The copyFile in release.go is for build artifacts: it keeps
-// the source and does not set the executable bit, so it cannot be
-// reused here.)
+// copyExecutable moves src to dst, even across filesystems and even
+// when dst is the running binary: it copies src to a temp file in
+// dst's own directory (same filesystem) and renames that over dst.
+// Writing to dst directly would fail with "text file busy" while
+// the binary is running, and renaming src to dst across filesystems
+// fails with "invalid cross-device link" — the temp file in dst's
+// directory avoids both. (The copyFile in release.go is for build
+// artifacts: it keeps the source and does not set the executable
+// bit, so it cannot be reused here.)
 func copyExecutable(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".angrboda-update-*")
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := io.Copy(tmp, in); err != nil {
+		tmp.Close()
 		return err
 	}
-	if err := out.Close(); err != nil {
+	if err := tmp.Chmod(0755); err != nil {
+		tmp.Close()
 		return err
 	}
-	if err := os.Chmod(dst, 0755); err != nil {
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, dst); err != nil {
 		return err
 	}
 	return os.Remove(src)
