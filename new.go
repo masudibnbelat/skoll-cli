@@ -287,10 +287,13 @@ func writeTemplate(templateFS embed.FS, templateRoot string, replacements []stru
 		if err != nil {
 			return err
 		}
-		rel := strings.TrimPrefix(path, templateRoot+"/")
-		if rel == "" || rel == "." {
+		if path == templateRoot {
+			// The template root itself ("templates/compose") is not
+			// part of the project — skip it, or an empty
+			// templates/compose dir leaks into every new project.
 			return nil
 		}
+		rel := strings.TrimPrefix(path, templateRoot+"/")
 		rel = strings.ReplaceAll(rel, "com/example/app", pkgPath)
 		if d.IsDir() {
 			return os.MkdirAll(filepath.Join(out, filepath.FromSlash(rel)), 0o755)
