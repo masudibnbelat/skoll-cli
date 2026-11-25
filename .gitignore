@@ -1,6 +1,6 @@
-/ktdev
-/ktdev.exe
-/ktdev-linux-amd64
-/ktdev-windows-amd64.exe
+/angrboda
+/angrboda.exe
+/angrboda-linux-amd64
+/angrboda-windows-amd64.exe
 /dist/
 *.apk

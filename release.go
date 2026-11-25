@@ -9,26 +9,59 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
+
+// Flags for `angrboda release`, bound in init() below.
+var (
+	releaseMajor  bool
+	releaseMinor  bool
+	releaseDryRun bool
+	releaseYes    bool
+)
+
+var releaseCmd = &cobra.Command{
+	Use:   "release [v1.5.0] [\"notes\"]",
+	Short: "Tag, build and publish a GitHub release",
+	Long: `Tags the next version (or the one you give), builds the release APK,
+checks the APK versionName matches the tag, pushes code + tag, and
+creates the GitHub release with the APK attached.
+
+A dirty tree stops the release unless --yes is given. If the build or
+the stamp check fails, the local tag is removed again so you can retry.`,
+	Args: cobra.MaximumNArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdRelease(args)
+	},
+}
+
+func init() {
+	releaseCmd.Flags().BoolVar(&releaseMajor, "major", false, "Bump the major version (v1.2.3 -> v2.0.0)")
+	releaseCmd.Flags().BoolVar(&releaseMinor, "minor", false, "Bump the minor version (v1.2.3 -> v1.3.0)")
+	releaseCmd.Flags().BoolVar(&releaseDryRun, "dry-run", false, "Show the tag and stop before commit / tag / build / push")
+	releaseCmd.Flags().BoolVar(&releaseYes, "yes", false, "Release with uncommitted changes (a dirty tree stops otherwise)")
+}
 
 // cmdRelease mirrors the Bash release helper, with the same three fixes:
 //   - no `git add -A` auto-commit on a dirty tree unless --yes,
 //   - the tag is removed again if the build / stamp check fails,
 //   - the APK versionName stamp must match the tag before upload.
+// The tag and notes still come from the positional args; the flags
+// (--major/--minor/--dry-run/--yes) are Cobra flags now.
 func cmdRelease(args []string) {
-	var raw, notes, bump string
-	dryRun, yes := false, false
+	var raw, notes string
+	bump := ""
+	if releaseMajor {
+		bump = "major"
+	}
+	if releaseMinor {
+		bump = "minor"
+	}
+	dryRun, yes := releaseDryRun, releaseYes
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
-		case a == "--major":
-			bump = "major"
-		case a == "--minor":
-			bump = "minor"
-		case a == "--dry-run":
-			dryRun = true
-		case a == "--yes":
-			yes = true
 		case strings.HasPrefix(a, "v") || (len(a) > 0 && a[0] >= '0' && a[0] <= '9'):
 			if raw == "" {
 				raw = a
@@ -54,6 +87,14 @@ func cmdRelease(args []string) {
 		die(err.Error())
 	}
 	say("Project: " + root)
+
+	// `angrboda release` does not support Flutter projects yet: the
+	// version lives in pubspec.yaml, not in Gradle files, so the
+	// stamp check and the bump have nothing to work on. Build the
+	// release APK with `angrboda build --release` and tag it yourself.
+	if isFlutterProject(root) {
+		die("angrboda release does not support Flutter projects yet — build with `angrboda build --release` and tag the version yourself (pubspec.yaml holds the version).")
+	}
 
 	if err := runLive("git", "fetch", "--tags", "origin"); err != nil {
 		if dryRun {
@@ -222,7 +263,7 @@ func cmdRelease(args []string) {
 	// Build + stamp passed; the tag is now safe to keep.
 	failed = false
 
-	// Same as `ktdev build`: copy the release APK to <project>/apk/
+	// Same as `angrboda build`: copy the release APK to <project>/apk/
 	// as <project>-release.apk too (copy, not move — the original
 	// stays where Gradle put it).
 	copyBuiltApk(root, "release")

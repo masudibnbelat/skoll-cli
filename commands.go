@@ -5,7 +5,94 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
+
+// Flags for `angrboda build` and `angrboda run`, bound in init() below.
+var (
+	buildRelease bool
+	buildClean   bool
+	runClean     bool
+	runRelease   bool
+	runDevice    string
+)
+
+var buildCmd = &cobra.Command{
+	Use:   "build",
+	Short: "Build the APK, no install",
+	Long: `Build only — never install. assembleDebug needs no phone and no adb.
+The APK is copied to <project>/apk/<project>-debug.apk (or -release.apk).
+For a Flutter project it runs ` + "`flutter build apk`" + ` instead.`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdBuild(buildRelease, buildClean)
+	},
+}
+
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: "Build, install and launch the app on the connected phone",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdRun(runClean, runRelease, runDevice)
+	},
+}
+
+var devicesCmd = &cobra.Command{
+	Use:   "devices",
+	Short: "List connected devices (adb devices)",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdDevices()
+	},
+}
+
+var logsCmd = &cobra.Command{
+	Use:   "logs",
+	Short: "Follow logcat for this app (Ctrl+C to stop)",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdLogs()
+	},
+}
+
+var uninstallCmd = &cobra.Command{
+	Use:   "uninstall",
+	Short: "Uninstall this app from the connected phone",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdUninstall()
+	},
+}
+
+var cleanCmd = &cobra.Command{
+	Use:   "clean",
+	Short: "Run the Gradle clean task",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdClean()
+	},
+}
+
+var doctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Check the environment: Java, adb, Gradle, project",
+	Long: `Doctor only reports — it never downloads anything.
+The install happens on the first build / run.`,
+	Args: cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmdDoctor()
+	},
+}
+
+func init() {
+	buildCmd.Flags().BoolVar(&buildRelease, "release", false, "Build the release APK (assembleRelease)")
+	buildCmd.Flags().BoolVar(&buildClean, "clean", false, "Run the clean task first")
+	runCmd.Flags().BoolVar(&runClean, "clean", false, "Run the clean task first")
+	runCmd.Flags().BoolVar(&runRelease, "release", false, "Build and install the release APK (installRelease)")
+	runCmd.Flags().StringVar(&runDevice, "device", "", "Only use the device with this serial")
+}
 
 func gradleArgs() []string {
 	// Kept on purpose: --no-daemon --max-workers=1 (8 GB RAM).
@@ -29,10 +116,10 @@ func mustGradle(root string) string {
 }
 
 func cmdDoctor() {
-	fmt.Println("ktdev " + version + " — environment check")
+	fmt.Println("angrboda " + version + " — environment check")
 	fmt.Println("ANDROID_HOME: " + os.Getenv("ANDROID_HOME"))
-	// Java and adb are reported from where ktdev would actually use
-	// them (system first, ktdev cache second). Doctor never downloads
+	// Java and adb are reported from where angrboda would actually use
+	// them (system first, angrboda cache second). Doctor never downloads
 	// anything — the install happens on the first build / run.
 	if bin, _, src := findJava(); bin != "" {
 		fmt.Println("java: " + bin + " (" + src + ")")
@@ -44,7 +131,7 @@ func cmdDoctor() {
 	} else {
 		fmt.Println("adb: MISSING (auto-installs platform-tools on run)")
 	}
-	for _, tool := range []string{"gh", "gradle"} {
+	for _, tool := range []string{"gh", "gradle", "flutter"} {
 		if p, err := lookPath(tool); err == nil {
 			fmt.Println(tool + ": " + p)
 		} else {
@@ -67,6 +154,14 @@ func cmdDoctor() {
 		return
 	}
 	fmt.Println("Project: " + root)
+	if isFlutterProject(root) {
+		fmt.Println("Project type: Flutter")
+		if v := wrapperGradleVersion(filepath.Join(root, "android")); v != "" {
+			fmt.Println("Android Gradle version: " + v)
+		}
+		return
+	}
+	fmt.Println("Project type: Kotlin (Gradle)")
 	if v := wrapperGradleVersion(root); v != "" {
 		fmt.Println("Wrapper Gradle version: " + v)
 	} else {
@@ -91,28 +186,21 @@ func cmdDevices() {
 	}
 }
 
-func cmdBuild(args []string) {
-	release, clean := false, false
-	for _, a := range args {
-		switch a {
-		case "--release":
-			release = true
-		case "--clean":
-			clean = true
-		default:
-			die("unknown flag for build: " + a + " (try: ktdev build [--release] [--clean])")
-		}
-	}
+func cmdBuild(release, clean bool) {
 	// Build only — never install. assembleDebug needs no phone and no adb.
 	// (installDebug would fail with "No connected devices!" when no phone
-	// is plugged in, so it belongs to `ktdev run` only, not to `ktdev build`.)
-	task := "assembleDebug"
-	if release {
-		task = "assembleRelease"
-	}
+	// is plugged in, so it belongs to `angrboda run` only, not to `angrboda build`.)
 	root := mustRoot()
 	if err := os.Chdir(root); err != nil {
 		die(err.Error())
+	}
+	if isFlutterProject(root) {
+		buildFlutter(root, release, clean)
+		return
+	}
+	task := "assembleDebug"
+	if release {
+		task = "assembleRelease"
 	}
 	say("Project: " + root)
 	ensureJava()
@@ -173,31 +261,63 @@ func copyBuiltApk(root, variant string) {
 	say("APK: " + dest)
 }
 
-func cmdRun(args []string) {
-	clean, release := false, false
-	device := ""
-	for i := 0; i < len(args); i++ {
-		switch {
-		case args[i] == "--clean":
-			clean = true
-		case args[i] == "--release":
-			release = true
-		case args[i] == "--device" && i+1 < len(args):
-			device = args[i+1]
-			i++
-		case strings.HasPrefix(args[i], "--device="):
-			device = strings.TrimPrefix(args[i], "--device=")
-		default:
-			die("unknown flag for run: " + args[i] + " (try: ktdev run [--clean] [--device SERIAL] [--release])")
+// buildFlutter builds a Flutter project's APK with the Flutter SDK
+// and copies it to <project>/apk/<project>-<variant>.apk, like the
+// Gradle path does for Kotlin projects.
+func buildFlutter(root string, release, clean bool) {
+	if _, err := lookPath("flutter"); err != nil {
+		die("Flutter SDK not found on PATH. Install Flutter (https://docs.flutter.dev/get-started/install) and retry — `flutter --version` should work first.")
+	}
+	say("Project: " + root + " (Flutter)")
+	if clean {
+		if err := runLive("flutter", "clean"); err != nil {
+			die("flutter clean failed: " + err.Error())
 		}
+	}
+	variant := "debug"
+	mode := "--debug"
+	if release {
+		variant = "release"
+		mode = "--release"
+	}
+	if err := runLive("flutter", "build", "apk", mode); err != nil {
+		die("flutter build failed: " + err.Error())
+	}
+	copyFlutterApk(root, variant)
+}
+
+// copyFlutterApk copies the APK `flutter build apk` just made
+// (build/app/outputs/flutter-apk/app-<variant>.apk) to
+// <project>/apk/<project>-<variant>.apk. Copy, not move: the
+// original stays where Flutter put it.
+func copyFlutterApk(root, variant string) {
+	src := filepath.Join(root, "build", "app", "outputs", "flutter-apk", "app-"+variant+".apk")
+	if _, err := os.Stat(src); err != nil {
+		die("build passed, but no APK was found in " + filepath.Join(root, "build", "app", "outputs", "flutter-apk"))
+	}
+	outDir := filepath.Join(root, "apk")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		die("could not create apk folder: " + err.Error())
+	}
+	dest := filepath.Join(outDir, filepath.Base(root)+"-"+variant+".apk")
+	if err := copyFile(src, dest); err != nil {
+		die("could not copy APK to " + dest + ": " + err.Error())
+	}
+	say("APK: " + dest)
+}
+
+func cmdRun(clean, release bool, device string) {
+	root := mustRoot()
+	if err := os.Chdir(root); err != nil {
+		die(err.Error())
+	}
+	if isFlutterProject(root) {
+		runFlutter(root, clean, release, device)
+		return
 	}
 	task := "installDebug"
 	if release {
 		task = "installRelease"
-	}
-	root := mustRoot()
-	if err := os.Chdir(root); err != nil {
-		die(err.Error())
 	}
 	say("Project: " + root)
 	ensureJava()
@@ -218,7 +338,7 @@ func cmdRun(args []string) {
 	if err := runLiveEnv(gradle, env, append(gradleArgs(), task)...); err != nil {
 		die("build/install failed.")
 	}
-	// Same as `ktdev build`: copy the APK to <project>/apk/ too.
+	// Same as `angrboda build`: copy the APK to <project>/apk/ too.
 	variant := "debug"
 	if release {
 		variant = "release"
@@ -231,6 +351,38 @@ func cmdRun(args []string) {
 	launchApp(serial, pkg)
 }
 
+func runFlutter(root string, clean, release bool, device string) {
+	if _, err := lookPath("flutter"); err != nil {
+		die("Flutter SDK not found on PATH. Install Flutter (https://docs.flutter.dev/get-started/install) and retry — `flutter --version` should work first.")
+	}
+	say("Project: " + root + " (Flutter)")
+	if clean {
+		if err := runLive("flutter", "clean"); err != nil {
+			die("flutter clean failed: " + err.Error())
+		}
+	}
+	// `flutter run` installs, launches, and stays attached (hot reload
+	// with r, quit with q). It picks the device itself unless -d is given.
+	args := []string{"run"}
+	if release {
+		args = append(args, "--release")
+	}
+	if device != "" {
+		args = append(args, "-d", device)
+	}
+	if err := runLive("flutter", args...); err != nil {
+		die("flutter run failed.")
+	}
+	// Copy the APK it built, like the Gradle path does.
+	variant := "debug"
+	if release {
+		variant = "release"
+	}
+	if _, err := os.Stat(filepath.Join(root, "build", "app", "outputs", "flutter-apk", "app-"+variant+".apk")); err == nil {
+		copyFlutterApk(root, variant)
+	}
+}
+
 func cmdUninstall() {
 	root := mustRoot()
 	if err := os.Chdir(root); err != nil {
@@ -238,7 +390,7 @@ func cmdUninstall() {
 	}
 	pkg := findPackage(root)
 	if pkg == "" {
-		die("package name not found — build once first (ktdev build).")
+		die("package name not found — build once first (angrboda build).")
 	}
 	ensureAdb()
 	serial, err := pickDevice("")
@@ -256,6 +408,15 @@ func cmdClean() {
 	if err := os.Chdir(root); err != nil {
 		die(err.Error())
 	}
+	if isFlutterProject(root) {
+		if _, err := lookPath("flutter"); err != nil {
+			die("Flutter SDK not found on PATH. Install Flutter (https://docs.flutter.dev/get-started/install) and retry — `flutter --version` should work first.")
+		}
+		if err := runLive("flutter", "clean"); err != nil {
+			die("flutter clean failed: " + err.Error())
+		}
+		return
+	}
 	ensureJava()
 	gradle := mustGradle(root)
 	if err := runLive(gradle, append(gradleArgs(), "clean")...); err != nil {
@@ -263,7 +424,7 @@ func cmdClean() {
 	}
 }
 
-func cmdLogs(args []string) {
+func cmdLogs() {
 	ensureAdb()
 	serial, err := pickDevice("")
 	if err != nil {

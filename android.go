@@ -12,11 +12,6 @@ import (
 	"strings"
 )
 
-
-
-
-
-
 // runLive runs a command with stdout/stderr connected to the terminal,
 // so the user sees Gradle / adb output live. It returns the exit error.
 func runLive(name string, args ...string) error {
@@ -83,7 +78,7 @@ func pickDevice(want string) (string, error) {
 	}
 	// Only prompt when stdin is a terminal.
 	if fi, _ := os.Stdin.Stat(); fi == nil || (fi.Mode()&os.ModeCharDevice) == 0 {
-		return "", fmt.Errorf("pass one with: ktdev run --device SERIAL")
+		return "", fmt.Errorf("pass one with: angrboda run --device SERIAL")
 	}
 	fmt.Fprintf(os.Stderr, "Pick one [1-%d]: ", len(devs))
 	reader := bufio.NewReader(os.Stdin)
@@ -98,43 +93,54 @@ func pickDevice(want string) (string, error) {
 
 // findPackage finds the app's applicationId: build output-metadata.json
 // first, then `aapt dump badging`, then the build.gradle file.
+// Flutter projects are covered too: their metadata lives under
+// build/app/outputs/apk/ and their applicationId in
+// android/app/build.gradle.kts.
 func findPackage(root string) string {
 	foundPackage = ""
-	// 1. output-metadata.json under app/build/outputs/apk
-	apkDir := filepath.Join(root, "app", "build", "outputs", "apk")
-	_ = filepath.Walk(apkDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || info.Name() != "output-metadata.json" {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		var meta struct {
-			ApplicationID string `json:"applicationId"`
-		}
-		if json.Unmarshal(data, &meta) == nil && meta.ApplicationID != "" {
-			// Store via a package-level trick: return value through closure.
-			// We use the first hit by writing it to the outer variable.
-			// (Walk continues, but the first hit wins because we only set once.)
-			if foundPackage == "" {
-				foundPackage = meta.ApplicationID
+	// 1. output-metadata.json under app/build/outputs/apk (Kotlin) or
+	// build/app/outputs/apk (Flutter).
+	apkDirs := []string{
+		filepath.Join(root, "app", "build", "outputs", "apk"),
+		filepath.Join(root, "build", "app", "outputs", "apk"),
+	}
+	for _, apkDir := range apkDirs {
+		_ = filepath.Walk(apkDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() || info.Name() != "output-metadata.json" {
+				return nil
 			}
-		}
-		return nil
-	})
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			var meta struct {
+				ApplicationID string `json:"applicationId"`
+			}
+			if json.Unmarshal(data, &meta) == nil && meta.ApplicationID != "" {
+				// Store via a package-level trick: return value through closure.
+				// We use the first hit by writing it to the outer variable.
+				// (Walk continues, but the first hit wins because we only set once.)
+				if foundPackage == "" {
+					foundPackage = meta.ApplicationID
+				}
+			}
+			return nil
+		})
+	}
 	if foundPackage != "" {
 		return foundPackage
 	}
 
 	// 2. aapt dump badging on the first APK found.
 	var apk string
-	_ = filepath.Walk(apkDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() && strings.HasSuffix(info.Name(), ".apk") && apk == "" {
-			apk = path
-		}
-		return nil
-	})
+	for _, apkDir := range apkDirs {
+		_ = filepath.Walk(apkDir, func(path string, info os.FileInfo, err error) error {
+			if err == nil && !info.IsDir() && strings.HasSuffix(info.Name(), ".apk") && apk == "" {
+				apk = path
+			}
+			return nil
+		})
+	}
 	if apk != "" {
 		if aapt := findAapt(); aapt != "" {
 			if out, err := runCapture(aapt, "dump", "badging", apk); err == nil {
@@ -145,8 +151,9 @@ func findPackage(root string) string {
 		}
 	}
 
-	// 3. applicationId in app/build.gradle[.kts]
-	for _, name := range []string{"app/build.gradle.kts", "app/build.gradle"} {
+	// 3. applicationId in app/build.gradle[.kts] (Kotlin) or
+	// android/app/build.gradle[.kts] (Flutter).
+	for _, name := range []string{"app/build.gradle.kts", "app/build.gradle", "android/app/build.gradle.kts", "android/app/build.gradle"} {
 		data, err := os.ReadFile(filepath.Join(root, name))
 		if err != nil {
 			continue

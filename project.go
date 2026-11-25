@@ -51,7 +51,8 @@ func addToPath(dir string) {
 }
 
 // findProjectRoot walks up from the current directory until it finds
-// an Android project (settings.gradle[.kts] or app/build.gradle[.kts]).
+// an Android project (settings.gradle[.kts] or app/build.gradle[.kts])
+// or a Flutter project (pubspec.yaml at the root).
 func findProjectRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -61,6 +62,7 @@ func findProjectRoot() (string, error) {
 		for _, name := range []string{
 			"settings.gradle.kts", "settings.gradle",
 			filepath.Join("app", "build.gradle.kts"), filepath.Join("app", "build.gradle"),
+			"pubspec.yaml",
 		} {
 			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 				return dir, nil
@@ -72,4 +74,11 @@ func findProjectRoot() (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// isFlutterProject reports whether root is a Flutter project
+// (created by `angrboda new --type flutter`): a pubspec.yaml at
+// the project root marks it.
+func isFlutterProject(root string) bool {
+	return fileExists(filepath.Join(root, "pubspec.yaml"))
 }

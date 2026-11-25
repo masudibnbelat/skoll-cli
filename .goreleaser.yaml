@@ -1,4 +1,4 @@
-# GoReleaser — builds ktdev for Linux + Windows from one tag.
+# GoReleaser — builds angrboda for Linux + Windows from one tag.
 # Push a tag (git tag v0.1.0 && git push origin v0.1.0) and the
 # release workflow builds these binaries and uploads them to
 # GitHub Releases. install.sh / install.ps1 download them from there.
@@ -8,7 +8,7 @@ before:
     - go mod tidy
 builds:
   - main: .
-    binary: ktdev
+    binary: angrboda
     env: [CGO_ENABLED=0]
     goos: [linux, windows, darwin]
     goarch: [amd64, arm64]
@@ -18,7 +18,7 @@ archives:
   - formats: ["binary"]
     # format: binary uploads the raw binaries directly (no .tar.gz/.zip),
     # which is what install.sh / install.ps1 download:
-    #   ktdev-linux-amd64, ktdev-windows-amd64.exe, ktdev-darwin-arm64, ...
+    #   angrboda-linux-amd64, angrboda-windows-amd64.exe, angrboda-darwin-arm64, ...
     name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
 checksum:
   name_template: checksums.txt

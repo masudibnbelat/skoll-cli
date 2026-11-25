@@ -51,8 +51,8 @@ func gradlewName() string {
 //     downloads and uses the exact wrapper version.
 //  2. A local install of the exact wrapper version:
 //     ~/.local/opt/gradle-<ver>/bin/gradle, ~/.gradle/wrapper/dists/...,
-//     or the ktdev cache ~/.ktdev/gradle/gradle-<ver>/bin/gradle.
-//  3. Auto-download that exact version once into the ktdev cache.
+//     or the angrboda cache ~/.angrboda/gradle/gradle-<ver>/bin/gradle.
+//  3. Auto-download that exact version once into the angrboda cache.
 //
 // The Gradle on PATH is never used when the wrapper wants another
 // version — that is the bug that broke AGP 8.x projects with 9.x.
@@ -79,11 +79,13 @@ func pickGradle(root string) (string, error) {
 	}
 
 	// 3. Auto-download the exact version once.
-	say("Gradle " + ver + " not installed locally — downloading it once...")
+	sp := startSpinner("Downloading Gradle " + ver)
 	downloaded, err := downloadGradle(ver)
 	if err != nil {
+		sp.stopFail("Gradle " + ver + " download failed")
 		return "", fmt.Errorf("wrapper wants Gradle %s but it is not installed and the download failed (%v). Install that exact version, or run: gradle wrapper --gradle-version %s", ver, err, ver)
 	}
+	sp.stop("Gradle " + ver + " ready")
 	return downloaded, nil
 }
 
@@ -94,7 +96,7 @@ func findLocalGradle(ver string) string {
 	if home != "" {
 		candidates = append(candidates,
 			filepath.Join(home, ".local", "opt", "gradle-"+ver, "bin", exe),
-			filepath.Join(home, ".ktdev", "gradle", "gradle-"+ver, "bin", exe),
+			filepath.Join(home, ".angrboda", "gradle", "gradle-"+ver, "bin", exe),
 		)
 		// Gradle's own wrapper cache: ~/.gradle/wrapper/dists/gradle-<ver>-bin/<hash>/gradle-<ver>/bin/gradle
 		glob := filepath.Join(home, ".gradle", "wrapper", "dists", "gradle-"+ver+"-bin", "*", "gradle-"+ver, "bin", exe)
@@ -126,16 +128,16 @@ func findLocalGradle(ver string) string {
 
 func gradleCacheDir(ver string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".ktdev", "gradle", "gradle-"+ver)
+	return filepath.Join(home, ".angrboda", "gradle", "gradle-"+ver)
 }
 
 // downloadGradle downloads gradle-<ver>-bin.zip from services.gradle.org
-// and extracts it to ~/.ktdev/gradle/gradle-<ver>/, then returns the
+// and extracts it to ~/.angrboda/gradle/gradle-<ver>/, then returns the
 // path to bin/gradle (or bin/gradle.bat on Windows).
 func downloadGradle(ver string) (string, error) {
 	url := "https://services.gradle.org/distributions/gradle-" + ver + "-bin.zip"
 	home, _ := os.UserHomeDir()
-	dlDir := filepath.Join(home, ".ktdev", "gradle", "downloads")
+	dlDir := filepath.Join(home, ".angrboda", "gradle", "downloads")
 	if err := os.MkdirAll(dlDir, 0755); err != nil {
 		return "", err
 	}
@@ -161,7 +163,7 @@ func downloadGradle(ver string) (string, error) {
 		f.Close()
 	}
 	dest := gradleCacheDir(ver)
-	if err := unzip(zipPath, filepath.Join(home, ".ktdev", "gradle")); err != nil {
+	if err := unzip(zipPath, filepath.Join(home, ".angrboda", "gradle")); err != nil {
 		return "", err
 	}
 	exe := filepath.Join(dest, "bin", gradleExeName())
