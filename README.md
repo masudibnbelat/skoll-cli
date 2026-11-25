@@ -608,7 +608,7 @@ Write what you changed and how you tested it.
 
 <div align="center">
 
-Made with Go + Cobra.
+Mib made with Go + Cobra.
 
 If angrboda saves you time, give it a star ⭐ — it helps others find it.
 
