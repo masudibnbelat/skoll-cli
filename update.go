@@ -169,6 +169,47 @@ func verifyChecksum(binPath, tag, asset string) error {
 	return nil
 }
 
+// moveFile moves src to dst. A plain rename is tried first; when it
+// fails because src and dst are on different filesystems (e.g. the
+// download in /tmp, which is often a tmpfs, and the install dir under
+// $HOME — rename then dies with "invalid cross-device link"), it falls
+// back to copying the bytes and removing the source.
+func moveFile(src, dst string) error {
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	// Rename failed (usually EXDEV: src and dst are on different
+	// filesystems) — copy the bytes instead.
+	return copyExecutable(src, dst)
+}
+
+// copyExecutable copies src to dst with executable mode and removes
+// src. (The copyFile in release.go is for build artifacts: it keeps
+// the source and does not set the executable bit, so it cannot be
+// reused here.)
+func copyExecutable(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(dst, 0755); err != nil {
+		return err
+	}
+	return os.Remove(src)
+}
+
 // replaceCurrentBinary swaps the running binary for the new one.
 // Unix: rename over the running file works. Windows: the running
 // .exe is locked, so the current file is first renamed aside
@@ -185,7 +226,7 @@ func replaceCurrentBinary(newBin string) error {
 		if err := os.Rename(current, old); err != nil {
 			return err
 		}
-		if err := os.Rename(newBin, current); err != nil {
+		if err := moveFile(newBin, current); err != nil {
 			// Roll back: put the old binary back.
 			_ = os.Rename(old, current)
 			return err
@@ -195,5 +236,5 @@ func replaceCurrentBinary(newBin string) error {
 	if err := os.Chmod(newBin, 0755); err != nil {
 		return err
 	}
-	return os.Rename(newBin, current)
+	return moveFile(newBin, current)
 }
