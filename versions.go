@@ -81,6 +81,57 @@ func (v appVersions) describe() string {
 	}
 }
 
+// describeWithoutBom is describe() without the Compose BOM part,
+// for the empty and library templates, which do not use Compose.
+func (v appVersions) describeWithoutBom() string {
+	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s", v.gradle, v.agp, v.kotlin)
+	switch {
+	case v.live == 4:
+		return "Latest versions: " + base
+	case v.live == 0:
+		return "Offline — pinned versions: " + base
+	default:
+		return "Versions: " + base + " (some pinned — no internet for those)"
+	}
+}
+
+// applyVersionPins overrides the looked-up versions with the
+// --gradle/--agp/--kotlin/--bom flags, when given. A bad shape dies
+// here instead of failing halfway through a Gradle build.
+func applyVersionPins(v appVersions) appVersions {
+	if newGradlePin != "" {
+		if !versionRe.MatchString(newGradlePin) {
+			die("bad --gradle '" + newGradlePin + "' — use a version like 9.3.1")
+		}
+		v.gradle = newGradlePin
+	}
+	if newAgpPin != "" {
+		if !versionRe.MatchString(newAgpPin) {
+			die("bad --agp '" + newAgpPin + "' — use a version like 9.1.1")
+		}
+		v.agp = newAgpPin
+	}
+	if newKotlinPin != "" {
+		if !versionRe.MatchString(newKotlinPin) {
+			die("bad --kotlin '" + newKotlinPin + "' — use a version like 2.2.10")
+		}
+		v.kotlin = newKotlinPin
+	}
+	if newBomPin != "" {
+		if !regexp.MustCompile(`^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$`).MatchString(newBomPin) {
+			die("bad --bom '" + newBomPin + "' — use a date like 2025.09.00")
+		}
+		v.bom = newBomPin
+	}
+	return v
+}
+
+// anyPinSet reports whether any --gradle/--agp/--kotlin/--bom flag
+// was given.
+func anyPinSet() bool {
+	return newGradlePin != "" || newAgpPin != "" || newKotlinPin != "" || newBomPin != ""
+}
+
 // fetchGradleVersion reads https://services.gradle.org/versions/current
 // and returns the current Gradle version, e.g. "9.3.1".
 func fetchGradleVersion(client *http.Client) string {

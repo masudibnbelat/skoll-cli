@@ -183,13 +183,13 @@ Gradle: /home/professor/MyApp/gradlew
 
 | Need | For |
 |---|---|
-| Android SDK (Android Studio installs it) | Building |
+| Android SDK (auto-installed on first build) | Building |
 | `git` | `release` |
 | `gh` (GitHub CLI, `gh auth login` once) | `release` only |
 | A phone with USB debugging on | `run`, `devices`, `logs`, `uninstall` |
 
 > [!TIP]
-> Java and `adb` are **not** in this list — `angrboda` installs them itself
+> Java, `adb`, the Android SDK and the Flutter SDK are **not** in this list — `angrboda` installs them itself
 > when they are missing. See [1.4 How It Works](#14-how-it-works).
 
 ---
@@ -236,20 +236,22 @@ Project name: MyApp
 Project type:
   1) Kotlin (Compose + Material 3)
   2) Flutter
+  3) Empty (Kotlin, no Compose)
+  4) Library (Android .aar)
 Choose [1]:
 Package name [com.example.myapp]:
 ```
 
-That creates `MyApp/` — a Kotlin project with the latest stable versions (Kotlin, AGP, Gradle, Compose BOM are looked up when you run it; pinned versions are used offline), or a Flutter project from Flutter's own current template (Flutter 3.50, Dart ^3.14.0, Gradle 9.5.0, AGP 9.3.1, Kotlin 2.4.20). Then:
+That creates `MyApp/` — a Kotlin project with the latest stable versions (Kotlin, AGP, Gradle, Compose BOM are looked up when you run it; pinned versions are used offline), a Flutter project from Flutter's own current template (Flutter 3.50, Dart ^3.14.0, Gradle 9.5.0, AGP 9.3.1, Kotlin 2.4.20), an Empty Kotlin project (one Activity, no Compose), or a Library project (one module, builds an .aar). Then:
 
 ```bash
 cd MyApp
 angrboda build
 ```
 
-No prompts? `angrboda new MyApp -t flutter -p com.masud.myapp`. Short form: `angrboda n MyApp`.
+No prompts? `angrboda new MyApp -t flutter -p com.masud.myapp`. Short form: `angrboda n MyApp`. To create the project in the current folder instead of a new subfolder: `angrboda init -t empty`. Pin a version instead of the latest: `angrboda new MyApp --gradle 9.3.1 --agp 9.1.1 --kotlin 2.2.10 --bom 2025.09.00` (pins are ignored for Flutter — it uses its own pinned versions).
 
-Flutter projects need the Flutter SDK on PATH (`flutter --version` should work first) and are Android-only for now — add other platforms later with `flutter create --platforms=ios .`. `build`, `run`, `clean` and `doctor` all work for Flutter projects; `release` does not support them yet (the version lives in pubspec.yaml, so build with `angrboda build --release` and tag it yourself).
+Flutter projects: the Flutter SDK installs itself on first build (large — over 1 GB, once) and are Android-only for now — add other platforms later with `flutter create --platforms=ios .`. `build`, `run`, `clean`, `doctor` and `release` all work for Flutter projects.
 
 #### Use 1 — Build only (no phone needed)
 
@@ -268,7 +270,20 @@ MyApp/apk/MyApp-debug.apk
 ```
 
 For a release build, use `angrboda build --release` instead.
-That makes `MyApp/apk/MyApp-release.apk`.
+That makes `MyApp/apk/MyApp-release.apk` — signed with your release
+keystore (created once on the first release build; see `angrboda
+keystore` and back it up). For a library project, `angrboda build`
+makes `MyLib/aar/MyLib-release.aar` instead — there is no app to run.
+
+For Google Play, build the App Bundle instead of the APK:
+
+```bash
+angrboda build --release --bundle
+```
+
+That makes `MyApp/bundle/MyApp-release.aab` — new apps on Google
+Play need an .aab, not an .apk. (`angrboda release --bundle`
+uploads both the APK and the .aab.)
 
 #### Use 2 — Build + install on your phone (phone needed)
 
@@ -305,14 +320,32 @@ angrboda release v1.5.0 "Fixed percent bug"
 
 **Step 3 —** `angrboda` does everything for you, in order:
 
-1. Makes the tag `v1.5.0`
-2. Builds the release APK
-3. Checks the APK version matches the tag
-4. Copies the APK to `MyApp/apk/MyApp-release.apk`
-5. Pushes the code and the tag to GitHub
-6. Creates the GitHub Release with the APK
+1. Bumps the version for you (Kotlin: versionName becomes the tag and versionCode goes up by one; Flutter: version in pubspec.yaml becomes the tag and the build number goes up by one; library: the tag is the version)
+2. Makes the tag `v1.5.0`
+3. Builds the release APK (signed — see below) or the .aar for a library
+4. Checks the APK version matches the tag, and that it is really signed
+5. Copies the APK to `MyApp/apk/MyApp-release.apk`
+6. Pushes the code and the tag to GitHub
+7. Creates the GitHub Release with the APK
 
 No phone needed. You need internet and `gh auth login` done once.
+
+**Release signing.** The first release build creates one release keystore, shared by all your apps, at `~/.angrboda/keystore/release.keystore` (alias `release`), and points the project at it — `local.properties` for Kotlin, `android/key.properties` for Flutter. Both files are gitignored. A keystore you already configured is never overwritten. See it any time with:
+
+```bash
+angrboda keystore
+```
+
+It prints the path, alias and SHA-1 / SHA-256 fingerprints. **Back up the keystore file and its passwords.** If it is lost, the app can never be updated on Google Play again. Move it to another machine with:
+
+```bash
+angrboda keystore export ~/keystore-backup   # on the old machine
+angrboda keystore import ~/keystore-backup   # on the new machine
+```
+
+Import refuses when a keystore already exists on the new machine — a silent replacement would break Play Store updates for every app signed with the old key.
+
+A download that is interrupted (net drops, laptop sleeps) resumes where it stopped the next time you run the command — the half-downloaded file is kept and only the rest is fetched. Before a big download angrboda also checks there is enough free disk space for it.
 
 > [!TIP]
 > To see what will happen, without doing it:
@@ -335,15 +368,20 @@ No phone needed. You need internet and `gh auth login` done once.
 
 | Command | What it does | Phone needed? |
 |---|---|---|
-| `angrboda new [name] [-t kotlin|flutter] [-p PKG]` | Create a new Kotlin or Flutter project | No |
+| `angrboda new [name] [-t kotlin|flutter|empty|library] [-p PKG] [--gradle V --agp V --kotlin V --bom V]` | Create a new Kotlin, Flutter, Empty or Library project | No |
+| `angrboda init [name] [-t TYPE] [-p PKG]` | Create a project in this folder | No |
 | `angrboda run [--clean] [--device SERIAL] [--release]` | Build, install on your phone, open it | **Yes** |
-| `angrboda build [--release] [--clean]` | Build only, copy APK to `apk/` | No |
-| `angrboda release [v1.5.0] ["notes"] [--major\|--minor\|--dry-run\|--yes]` | Tag, build, check version, push, GitHub Release | No |
+| `angrboda build [--release] [--clean] [--bundle]` | Build only, copy APK to `apk/` (.aar to `aar/` for a library, .aab to `bundle/` with --bundle) | No |
+| `angrboda release [v1.5.0] ["notes"] [--major\|--minor\|--dry-run\|--yes\|--bundle]` | Bump version, tag, build (signed), check, push, GitHub Release | No |
+| `angrboda keystore` | Show the release keystore (creates it if missing) | No |
+| `angrboda keystore export <folder>` | Copy keystore + passwords to a folder (backup / new machine) | No |
+| `angrboda keystore import <folder>` | Copy a keystore + passwords back in | No |
 | `angrboda devices` | List connected phones | Yes |
 | `angrboda logs` | Live logcat for your app | Yes |
 | `angrboda uninstall` | Uninstall your app from the phone | Yes |
 | `angrboda clean` | Gradle clean | No |
-| `angrboda doctor` | Check SDK, Java, adb, Gradle, project | No |
+| `angrboda doctor` | Check SDK, Java, adb, Gradle, keystore, git, gh login, disk space, project | No |
+| `angrboda update [--check]` | Update angrboda itself to the latest release | No |
 | `angrboda --help` | Show help | No |
 | `angrboda --version` | Show version | No |
 
@@ -527,6 +565,11 @@ Write what you changed and how you tested it.
 
 | Version | What changed |
 |---|---|
+| **v0.9.1** | A failed release really removes the local tag on every post-tag failure: copy failures (APK / .aar / .aab) and `git push` failures now go through the same cleanup, and the copy helpers return errors instead of dying; `--bundle` on a library project is rejected before the tag is created. `gh release create` failing still keeps the tag — the code and tag are already pushed by then. Version bumped so `angrboda version` tells the fixed build apart. |
+| **v0.9.0** | Release APKs are signed: first release build creates one shared keystore (`~/.angrboda/keystore/`, `angrboda keystore` shows it) and `release` verifies the signature with apksigner (unsigned or debug-signed fails); `build --release` and `run --release` also verify the signature; a failed release really removes the local tag again (the old defer never ran, because `die()` calls `os.Exit`); `release` works for Flutter (pubspec version bump) and libraries (.aar upload) and bumps the version for you (Kotlin versionName + versionCode, Flutter build number); `new` adds Empty and Library types; `angrboda init` scaffolds in the current folder; `--gradle/--agp/--kotlin/--bom` pin versions on `new`/`init`; downloads resume after an interruption (Range) and check free disk space first; `build --bundle` / `release --bundle` build the App Bundle (.aab) for Google Play; `keystore export` / `import` move the keystore to another machine; `doctor` shows keystore, git and gh login status; doctor never downloads Gradle as a side effect (read-only lookup) and shows free disk space (warns below 2 GB); the disk-space check works on Windows too (GetDiskFreeSpaceExW); the update notice re-checks every 6 hours instead of once a day |
+| **v0.8.1** | Automatic update notice: every command checks once a day (in the background) whether a newer release exists and shows a notice box with `angrboda update`; never slows a command, never fails one, silent when piped (ANGRBODA_NO_UPDATE_CHECK=1 turns it off) |
+| **v0.8.0** | Terminal UI: colored steps (→ / ✓ / ✗), live download bar with percent, sizes, speed and ETA, spinner with elapsed time, APK summary with size and build time; plain output when piped (NO_COLOR=1 forces plain) |
+| **v0.7.0** | Android SDK + Flutter SDK auto-install on first build (nothing left to install by hand); `angrboda update` self-updates with SHA256 check |
 | **v0.6.0** | `new` makes Kotlin or Flutter projects (type question + `-t` flag); Flutter template from Flutter 3.50 stable; `build`/`run`/`clean`/`doctor` work for Flutter; `release` stops clearly for Flutter |
 | **v0.5.0** | Renamed ktdev-cli to angrboda-cli; `new` is interactive (name + package prompts); loading spinner on downloads and version lookup; `new` always uses the latest stable versions (pinned fallback offline) |
 | **v0.4.2** | `angrboda new` default package is neutral com.example.<name> — the com.masud default was wrong for a universal CLI |
@@ -556,13 +599,8 @@ Write what you changed and how you tested it.
 
 ## What angrboda does NOT do
 
-- **It does not install the full Android SDK.** Java and `adb` install
-  themselves, but building still needs the SDK (platforms +
-  build-tools). Install Android Studio once for that.
-- **It does not work with Flutter or React Native directly.** Their
-  project layout is different. Running inside their `android/`
-  folder may build, but release naming will be wrong. `angrboda` is
-  for native Android (Kotlin/Java) projects.
+- **It does not install Android Studio (the IDE).** The SDK, Java, `adb` and Flutter all install themselves; only the IDE itself is yours to install if you want it.
+- **It does not support React Native.** Flutter projects work (Android-only for now).
 - **It does not run on your phone.** It runs on Windows, Linux,
   or macOS only.
 

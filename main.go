@@ -22,13 +22,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.6.0"
+const version = "0.9.1"
 
 func main() {
+	cleanStaleOldBinary()
 	ensureAndroidEnv()
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// cleanStaleOldBinary removes the .old file a Windows self-update
+// leaves behind (see replaceCurrentBinary in update.go). On Unix
+// there is never one.
+func cleanStaleOldBinary() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	_ = os.Remove(exe + ".old")
 }
 
 var rootCmd = &cobra.Command{
@@ -45,13 +57,22 @@ to ~/.angrboda/gradle/gradle-<version>/ (Linux) or
 The Gradle on PATH is never used as a fallback when the wrapper
 wants a different version.
 
-Java and adb install themselves when missing: no usable Java 17-21
--> Eclipse Temurin 17 is downloaded once to ~/.angrboda/jdk/
+Java, adb, the Android SDK and Flutter install themselves when missing:
+no usable Java 17-21 -> Eclipse Temurin 17 is downloaded once to ~/.angrboda/jdk/
 (%USERPROFILE%\.angrboda\jdk\ on Windows); no adb -> Google's
-platform-tools zip is downloaded once to ~/.angrboda/platform-tools/.
-Building still needs the full Android SDK (platforms + build-tools).`,
+platform-tools zip is downloaded once to ~/.angrboda/platform-tools/;
+no Android SDK -> cmdline-tools + platform-tools + the platform and
+build-tools for the project's API level are installed once to ~/Android/Sdk
+(%LOCALAPPDATA%\Android\Sdk on Windows); no flutter -> the latest
+stable Flutter SDK is downloaded once to ~/.angrboda/flutter/.
+Release builds are signed: the first one creates a release keystore
+once at ~/.angrboda/keystore/ (see angrboda keystore) — back it up.
+angrboda update updates angrboda itself to the latest release.`,
 	Version: version,
 	// Bare `angrboda` prints help, like before.
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		maybeNotifyUpdate(cmd)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		_ = cmd.Help()
 	},
@@ -70,20 +91,27 @@ func init() {
 	rootCmd.SetVersionTemplate("angrboda {{.Version}}\n")
 	rootCmd.AddCommand(
 		newCmd,
+		initCmd,
 		runCmd,
 		buildCmd,
 		releaseCmd,
+		keystoreCmd,
 		devicesCmd,
 		logsCmd,
 		uninstallCmd,
 		cleanCmd,
 		doctorCmd,
+		updateCmd,
 		versionCmd,
 	)
 }
 
 func die(msg string) {
-	fmt.Fprintln(os.Stderr, "STOP: "+msg)
+	if colorOn(os.Stderr) {
+		fmt.Fprintln(os.Stderr, red("STOP: ")+msg)
+	} else {
+		fmt.Fprintln(os.Stderr, "STOP: "+msg)
+	}
 	os.Exit(1)
 }
 

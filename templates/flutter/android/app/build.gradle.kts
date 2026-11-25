@@ -4,10 +4,32 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Release signing: `angrboda build --release` / `angrboda release`
+// create a release keystore once and write android/key.properties
+// (gitignored). Without it the release APK is signed with the debug key.
+val keystoreProperties = java.util.Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+val hasReleaseKey = keystorePropertiesFile.exists() &&
+    keystoreProperties.getProperty("storeFile") != null
+
 android {
     namespace = "{{Package}}"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -31,9 +53,10 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // With a release keystore (android/key.properties) the
+            // release APK is signed with it; without one it falls
+            // back to the debug keys, so `flutter run --release` works.
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 }

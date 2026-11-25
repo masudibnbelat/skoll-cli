@@ -27,8 +27,20 @@ case "$OS" in
 esac
 
 echo "== angrboda: finding latest release of $REPO"
-TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | grep -m1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
-[ -n "$TAG" ] || { echo "STOP: could not find the latest release. Has a release (tag vX.Y.Z) been published yet?"; exit 1; }
+# The GitHub web redirect gives the latest tag with no API call, so
+# it never hits the unauthenticated API rate limit (60/hour per IP —
+# that is what a 403 from api.github.com means). Fall back to the
+# API only if the redirect fails; GITHUB_TOKEN is honoured when set.
+TAG="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" | sed -E 's#.*/tag/##')"
+if [ -z "$TAG" ]; then
+  if [ -n "$GITHUB_TOKEN" ]; then
+    AUTH=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  else
+    AUTH=()
+  fi
+  TAG="$(curl -fsSL "${AUTH[@]}" "https://api.github.com/repos/$REPO/releases/latest" | grep -m1 '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')"
+fi
+[ -n "$TAG" ] || { echo "STOP: could not find the latest release. If GitHub answered 403, the API rate limit (60/hour per IP) is hit — wait an hour, or set GITHUB_TOKEN and retry. If no release exists yet, publish one: git tag v0.6.0 && git push origin v0.6.0"; exit 1; }
 echo "== latest: $TAG — downloading $ASSET"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

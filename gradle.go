@@ -4,14 +4,12 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
-	"time"
 )
 
 var gradleVerRe = regexp.MustCompile(`gradle-([0-9][0-9.]*)-(bin|all)\.zip`)
@@ -79,14 +77,30 @@ func pickGradle(root string) (string, error) {
 	}
 
 	// 3. Auto-download the exact version once.
-	sp := startSpinner("Downloading Gradle " + ver)
+	stepLine("Downloading Gradle " + ver + "…")
 	downloaded, err := downloadGradle(ver)
 	if err != nil {
-		sp.stopFail("Gradle " + ver + " download failed")
 		return "", fmt.Errorf("wrapper wants Gradle %s but it is not installed and the download failed (%v). Install that exact version, or run: gradle wrapper --gradle-version %s", ver, err, ver)
 	}
-	sp.stop("Gradle " + ver + " ready")
+	okLine("Gradle " + ver + " ready")
 	return downloaded, nil
+}
+
+// findGradleReadOnly finds the Gradle for this project WITHOUT
+// downloading anything: the project wrapper first, then a local
+// install of the wrapper version. It returns "" when nothing is
+// usable — the build downloads it then. Doctor uses this instead
+// of pickGradle, because a check must never download ~130 MB as a
+// side effect.
+func findGradleReadOnly(root string) string {
+	wrapper := filepath.Join(root, gradlewName())
+	if st, err := os.Stat(wrapper); err == nil && !st.IsDir() {
+		return wrapper
+	}
+	if ver := wrapperGradleVersion(root); ver != "" {
+		return findLocalGradle(ver)
+	}
+	return ""
 }
 
 func findLocalGradle(ver string) string {
@@ -142,25 +156,8 @@ func downloadGradle(ver string) (string, error) {
 		return "", err
 	}
 	zipPath := filepath.Join(dlDir, "gradle-"+ver+"-bin.zip")
-	if _, err := os.Stat(zipPath); err != nil {
-		client := &http.Client{Timeout: 10 * time.Minute}
-		resp, err := client.Get(url)
-		if err != nil {
-			return "", err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return "", fmt.Errorf("HTTP %s", resp.Status)
-		}
-		f, err := os.Create(zipPath)
-		if err != nil {
-			return "", err
-		}
-		if _, err := io.Copy(f, resp.Body); err != nil {
-			f.Close()
-			return "", err
-		}
-		f.Close()
+	if err := downloadFileProgress(url, zipPath, "Gradle "+ver); err != nil {
+		return "", err
 	}
 	dest := gradleCacheDir(ver)
 	if err := unzip(zipPath, filepath.Join(home, ".angrboda", "gradle")); err != nil {

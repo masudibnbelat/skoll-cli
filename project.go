@@ -82,3 +82,36 @@ func findProjectRoot() (string, error) {
 func isFlutterProject(root string) bool {
 	return fileExists(filepath.Join(root, "pubspec.yaml"))
 }
+
+// isLibraryProject reports whether root is an Android library project
+// (created by `angrboda new --type library`): some module applies
+// com.android.library and no module applies com.android.application.
+func isLibraryProject(root string) bool {
+	hasLib, hasApp := false, false
+	for _, mod := range []string{"app", "library"} {
+		for _, name := range []string{"build.gradle.kts", "build.gradle"} {
+			data, err := os.ReadFile(filepath.Join(root, mod, name))
+			if err != nil {
+				continue
+			}
+			if strings.Contains(string(data), "com.android.library") {
+				hasLib = true
+			}
+			if strings.Contains(string(data), "com.android.application") {
+				hasApp = true
+			}
+		}
+	}
+	return hasLib && !hasApp
+}
+
+// projectKind is "flutter", "library" or "kotlin".
+func projectKind(root string) string {
+	if isFlutterProject(root) {
+		return "flutter"
+	}
+	if isLibraryProject(root) {
+		return "library"
+	}
+	return "kotlin"
+}

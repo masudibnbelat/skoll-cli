@@ -206,12 +206,12 @@ func launchApp(serial, pkg string) {
 		}
 	}
 	if activity != "" && activity != "No activity found" {
-		say("Opening: " + pkg + " (" + activity + ")")
+		stepLine("Opening: " + pkg + " (" + activity + ")")
 		if err := runLive("adb", "-s", serial, "shell", "am", "start", "-W", "-n", activity); err != nil {
 			_ = runLive("adb", "-s", serial, "shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")
 		}
 		return
 	}
-	say("Opening: " + pkg)
+	stepLine("Opening: " + pkg)
 	_ = runLive("adb", "-s", serial, "shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")
 }

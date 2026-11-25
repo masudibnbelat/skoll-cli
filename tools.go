@@ -12,16 +12,14 @@ package main
 //     Java outside 17-21 is ignored and Temurin 17 is used instead.
 //   - adb: Google's platform-tools zip (adb + fastboot, ~10-15 MB).
 //
-// Honest limit: this installs Java and adb only. Building an Android
-// app still needs the full Android SDK (platforms + build-tools) —
-// angrboda does NOT download that. `angrboda build` still stops without it.
+// The full Android SDK (sdk.go) and the Flutter SDK (flutter.go)
+// install themselves the same way when a build needs them.
 
 import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,7 +27,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func fileExists(path string) bool {
@@ -49,32 +46,6 @@ func adbExeName() string {
 		return "adb.exe"
 	}
 	return "adb"
-}
-
-// downloadFile downloads url to destPath, skipping the download when
-// the file is already there (a previous run's cache).
-func downloadFile(url, destPath string) error {
-	if _, err := os.Stat(destPath); err == nil {
-		return nil
-	}
-	client := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("HTTP %s", resp.Status)
-	}
-	f, err := os.Create(destPath)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
 }
 
 // untarGz extracts a .tar.gz archive to destDir, with the same
@@ -192,13 +163,12 @@ func ensureJava() {
 		addToPath(filepath.Dir(bin))
 		return
 	}
-	sp := startSpinner("Downloading Eclipse Temurin 17")
+	stepLine("Installing Java (Eclipse Temurin 17)…")
 	bin, home, err := downloadTemurin17()
 	if err != nil {
-		sp.stopFail("Temurin 17 download failed")
 		die("could not install Java (" + err.Error() + "). Install JDK 17 once yourself and retry (e.g. sudo pacman -S jdk17-openjdk).")
 	}
-	sp.stop("Temurin 17 ready")
+	okLine("Temurin 17 ready")
 	say("Java: " + bin)
 	os.Setenv("JAVA_HOME", home)
 	addToPath(filepath.Dir(bin))
@@ -232,7 +202,7 @@ func downloadTemurin17() (string, string, error) {
 		ext = ".zip"
 	}
 	archive := filepath.Join(dlDir, "temurin-17"+ext)
-	if err := downloadFile(url, archive); err != nil {
+	if err := downloadFileProgress(url, archive, "Eclipse Temurin 17"); err != nil {
 		return "", "", err
 	}
 	tmpDir := filepath.Join(home, ".angrboda", "jdk", "tmp-extract")
@@ -307,13 +277,12 @@ func ensureAdb() {
 		addToPath(filepath.Dir(p))
 		return
 	}
-	sp := startSpinner("Downloading Google platform-tools")
+	stepLine("Installing adb (Google platform-tools)…")
 	p, err := downloadPlatformTools()
 	if err != nil {
-		sp.stopFail("platform-tools download failed")
 		die("could not install adb (" + err.Error() + "). Install Android SDK platform-tools once yourself and retry.")
 	}
-	sp.stop("platform-tools ready")
+	okLine("platform-tools ready")
 	say("adb: " + p)
 	addToPath(filepath.Dir(p))
 }
@@ -331,7 +300,7 @@ func downloadPlatformTools() (string, error) {
 		return "", err
 	}
 	archive := filepath.Join(dlDir, "platform-tools-latest-"+osName+".zip")
-	if err := downloadFile(url, archive); err != nil {
+	if err := downloadFileProgress(url, archive, "Google platform-tools"); err != nil {
 		return "", err
 	}
 	// The zip holds a top-level platform-tools/ dir; extract it

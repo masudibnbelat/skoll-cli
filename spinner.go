@@ -19,6 +19,7 @@ type spinner struct {
 	done   chan struct{}
 	wg     sync.WaitGroup
 	active bool
+	start  time.Time
 }
 
 func isTerminal(f *os.File) bool {
@@ -27,7 +28,7 @@ func isTerminal(f *os.File) bool {
 }
 
 func startSpinner(msg string) *spinner {
-	s := &spinner{done: make(chan struct{})}
+	s := &spinner{done: make(chan struct{}), start: time.Now()}
 	if !isTerminal(os.Stdout) {
 		return s
 	}
@@ -43,7 +44,7 @@ func startSpinner(msg string) *spinner {
 			case <-s.done:
 				return
 			case <-tick.C:
-				fmt.Fprintf(os.Stdout, "\r%s %s", spinnerFrames[i%len(spinnerFrames)], msg)
+				fmt.Fprintf(os.Stdout, "\r%s %s  %s", cyan(spinnerFrames[i%len(spinnerFrames)]), msg, dim(formatDuration(time.Since(s.start))))
 				i++
 			}
 		}
@@ -56,7 +57,7 @@ func (s *spinner) stop(msg string) {
 	if s.active {
 		close(s.done)
 		s.wg.Wait()
-		fmt.Fprintf(os.Stdout, "\r✓ %s\n", msg)
+		fmt.Fprintf(os.Stdout, "\r\x1b[K%s %s\n", green("✓"), msg)
 		return
 	}
 	fmt.Println("== " + msg)
@@ -67,7 +68,7 @@ func (s *spinner) stopFail(msg string) {
 	if s.active {
 		close(s.done)
 		s.wg.Wait()
-		fmt.Fprintf(os.Stdout, "\r✗ %s\n", msg)
+		fmt.Fprintf(os.Stdout, "\r\x1b[K%s %s\n", red("✗"), msg)
 		return
 	}
 	fmt.Println("STOP: " + msg)
