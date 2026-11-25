@@ -201,7 +201,11 @@ func askProjectType(reader *bufio.Reader) string {
 }
 
 // askPackage resolves the package name: the -p flag wins, otherwise
-// it asks with com.example.<name> as the default.
+// it asks with com.example.<name> as the default. A bare name is
+// enough — "demo" becomes com.example.demo by itself (lowercased
+// too), so the user only ever has to type the name. A full package
+// with dots is used as-is. The final package is printed by
+// printCreated, so the user always sees what was used.
 func askPackage(reader *bufio.Reader, appID string) string {
 	defaultPkg := "com.example." + strings.ToLower(appID)
 	pkg := newPackage
@@ -211,8 +215,13 @@ func askPackage(reader *bufio.Reader, appID string) string {
 			pkg = defaultPkg
 		}
 	}
+	orig := pkg
+	pkg = strings.ToLower(strings.TrimSpace(pkg))
+	if !strings.Contains(pkg, ".") {
+		pkg = "com.example." + pkg
+	}
 	if !packageRe.MatchString(pkg) {
-		die("bad package '" + pkg + "' — use lower-case letters, digits and dots, e.g. com.example.myapp")
+		die("bad package '" + orig + "' — use lower-case letters, digits and dots, e.g. com.example.myapp")
 	}
 	return pkg
 }
