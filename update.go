@@ -45,13 +45,16 @@ func cmdUpdate(checkOnly bool) {
 		die("could not find the latest release (" + err.Error() + "). Check your internet, or wait out GitHub's rate limit.")
 	}
 	if cmp := compareVersions(strings.TrimPrefix(latest, "v"), version); cmp < 0 {
-		okLine("You have v" + version + ", newer than the latest release (" + latest + ") — nothing to update.")
+		fmt.Println(green("✓") + " You have " + bold("v"+version) + ", newer than the latest release (" + latest + ") — nothing to update.")
 		return
 	} else if cmp == 0 {
-		okLine("skoll " + version + " is already the latest (" + latest + ").")
+		fmt.Println(green("✓") + " " + bold("skoll "+version) + " is already the latest (" + latest + ").")
 		return
 	}
-	stepLine("Update available: " + latest + " (you have v" + version + ")")
+	printBox([]string{
+		cyan("↑") + "  Update available: " + bold(green(latest)),
+		"  You have " + bold("v"+version) + dim("  →  "+latest),
+	})
 	if checkOnly {
 		return
 	}
@@ -73,7 +76,10 @@ func cmdUpdate(checkOnly bool) {
 	if err := replaceCurrentBinary(tmpBin); err != nil {
 		die("could not replace the current binary (" + err.Error() + "). If it lives in a protected folder, reinstall with the installer instead.")
 	}
-	okLine("Updated to " + latest + " — run `skoll --version` to confirm.")
+	printBox([]string{
+		green("✓") + "  Updated to " + bold(green(latest)),
+		dim("  Run `skoll --version` to confirm."),
+	})
 }
 
 func updateAssetName() string {

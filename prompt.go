@@ -24,6 +24,12 @@ import (
 // Get the dependency once, then it builds offline:
 //   go get golang.org/x/term
 //   go mod tidy
+//
+// Raw-mode line endings: MakeRaw turns OFF the terminal's \n →
+// \r\n translation, so a plain \n only moves the cursor DOWN — the
+// next line starts where the last one ended and the menu smears
+// across the screen. Every line the menu prints therefore ends
+// with \r\n (see menuPrintln), never a bare \n.
 
 var errNotTerminal = errors.New("not a terminal")
 var errCancelled = errors.New("cancelled")
@@ -120,6 +126,13 @@ func readByteTimeout(r *bufio.Reader, d time.Duration) (byte, bool) {
 	}
 }
 
+// menuPrintln prints one menu line. It must end with \r\n, not \n:
+// in raw mode \n alone only moves down (see the note at the top),
+// so a plain newline would smear the menu.
+func menuPrintln(s string) {
+	fmt.Fprint(os.Stdout, s+"\r\n")
+}
+
 // selectOne shows an arrow-key menu and returns the chosen index.
 // The menu is drawn in place: moving re-renders the same lines, so
 // it animates instead of scrolling. On Enter it clears the menu and
@@ -160,7 +173,7 @@ func selectOne(reader *bufio.Reader, title string, choices []selectChoice) (int,
 		case keyEnter:
 			clearMenu(total)
 			c := choices[selected]
-			fmt.Fprintf(os.Stdout, "%s %s: %s %s\n", green("✓"), title, bold(c.label), dim("— "+c.desc))
+			fmt.Fprintf(os.Stdout, "%s %s: %s %s\r\n", green("✓"), title, bold(c.label), dim("— "+c.desc))
 			return selected, nil
 		case keyCancel:
 			clearMenu(total)
@@ -173,11 +186,11 @@ func selectOne(reader *bufio.Reader, title string, choices []selectChoice) (int,
 }
 
 func renderMenu(title string, choices []selectChoice, selected int) {
-	fmt.Fprintln(os.Stdout, bold(cyan(title+":")))
+	menuPrintln(bold(cyan(title + ":")))
 	for i, c := range choices {
-		fmt.Fprintln(os.Stdout, menuLine(c, i == selected))
+		menuPrintln(menuLine(c, i == selected))
 	}
-	fmt.Fprintln(os.Stdout, dim("  ↑ ↓ move · Enter select · 1-4 jump · Esc cancel"))
+	menuPrintln(dim("  ↑ ↓ move · Enter select · 1-4 jump · Esc cancel"))
 }
 
 // redrawMenu moves back to the title line and draws the menu again
@@ -194,18 +207,19 @@ func clearMenu(total int) {
 	for i := 0; i < total; i++ {
 		fmt.Fprint(os.Stdout, "\r\x1b[K")
 		if i < total-1 {
-			fmt.Fprint(os.Stdout, "\n")
+			fmt.Fprint(os.Stdout, "\r\n")
 		}
 	}
 	fmt.Fprint(os.Stdout, "\r")
 }
 
-// menuLine renders one row: the selected row gets a green ❯ and a
+// menuLine renders one row: the selected row gets a green » and a
 // bold label in its accent color, the others get their accent
-// color without the bold.
+// color without the bold. The cursor is » (not ❯) because ❯
+// renders as ) in some terminal fonts.
 func menuLine(c selectChoice, selected bool) string {
 	if selected {
-		return "  " + green("❯ ") + bold(c.accent(c.label)) + dim(" — "+c.desc)
+		return "  " + green("» ") + bold(c.accent(c.label)) + dim(" — "+c.desc)
 	}
 	return "    " + c.accent(c.label) + dim(" — "+c.desc)
 }

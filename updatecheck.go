@@ -1,3 +1,4 @@
+// Location: updatecheck.go
 package main
 
 import (
@@ -125,15 +126,14 @@ func refreshUpdateCacheAsync(path string) {
 
 // printUpdateNotice prints the update box:
 //
-//	─────────────────────────────────────────────
-//	✨  Update available: v0.8.1  (you have v0.8.0)
-//	    Run `skoll update` to install it.
-//	─────────────────────────────────────────────
+//	┌───────────────────────────────────────────────┐
+//	│ ✨  Update available: v2.0.0  (you have v1.0.5) │
+//	│     Run skoll update to install it.           │
+//	└───────────────────────────────────────────────┘
 func printUpdateNotice(latest string) {
-	rule := dim(strings.Repeat("─", 45))
 	fmt.Println()
-	fmt.Println(rule)
-	fmt.Println(yellow("✨") + "  Update available: " + green(latest) + dim("  (you have v"+version+")"))
-	fmt.Println(dim("    Run `skoll update` to install it."))
-	fmt.Println(rule)
+	printBox([]string{
+		yellow("✨") + "  Update available: " + bold(green(latest)) + dim("  (you have v"+version+")"),
+		"    Run " + cyan("skoll update") + dim(" to install it."),
+	})
 }
