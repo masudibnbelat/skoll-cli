@@ -1,11 +1,11 @@
 package main
 
-// tools.go — Java and adb, installed by angrboda itself when missing.
-// Same pattern as Gradle (gradle.go): system copy first, angrboda cache
+// tools.go — Java and adb, installed by skoll itself when missing.
+// Same pattern as Gradle (gradle.go): system copy first, skoll cache
 // second, download once third. No package manager, no sudo, no
 // Android Studio needed — the downloads come straight from the
-// official sources and are cached under ~/.angrboda/ (Linux/macOS) or
-// %USERPROFILE%\.angrboda\ (Windows), so they are downloaded once.
+// official sources and are cached under ~/.skoll/ (Linux/macOS) or
+// %USERPROFILE%\.skoll\ (Windows), so they are downloaded once.
 //
 //   - Java: Eclipse Temurin 17 (Adoptium). Gradle 8.x + AGP 8.x need
 //     JDK 17 to run, and Gradle 8.9 runs on Java 17-21, so a system
@@ -127,13 +127,13 @@ func javaUsable(javaBin string) bool {
 	return v == 0 || (v >= 17 && v <= 21)
 }
 
-func angrbodaJDKHome() string {
+func skollJDKHome() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".angrboda", "jdk", "temurin-17")
+	return filepath.Join(home, ".skoll", "jdk", "temurin-17")
 }
 
 // findJava returns (javaBin, javaHome, source). source is one of
-// "JAVA_HOME", "system", "angrboda", or "" when no usable Java exists.
+// "JAVA_HOME", "system", "skoll", or "" when no usable Java exists.
 // It never downloads anything — use ensureJava for that.
 func findJava() (string, string, string) {
 	exe := javaExeName()
@@ -145,15 +145,15 @@ func findJava() (string, string, string) {
 	if p, err := lookPath("java"); err == nil && javaUsable(p) {
 		return p, "", "system"
 	}
-	home := angrbodaJDKHome()
+	home := skollJDKHome()
 	if bin := filepath.Join(home, "bin", exe); fileExists(bin) {
-		return bin, home, "angrboda"
+		return bin, home, "skoll"
 	}
 	return "", "", ""
 }
 
 // ensureJava makes sure a `java` is available for Gradle: system Java
-// wins, else the angrboda cache, else Temurin 17 is downloaded once.
+// wins, else the skoll cache, else Temurin 17 is downloaded once.
 // It sets JAVA_HOME + PATH for the Gradle child processes.
 func ensureJava() {
 	if bin, home, _ := findJava(); bin != "" {
@@ -175,7 +175,7 @@ func ensureJava() {
 }
 
 // downloadTemurin17 downloads the Temurin 17 JDK for this OS/arch
-// from Adoptium and extracts it to ~/.angrboda/jdk/temurin-17/.
+// from Adoptium and extracts it to ~/.skoll/jdk/temurin-17/.
 // It returns (javaBin, jdkHome).
 func downloadTemurin17() (string, string, error) {
 	osName := runtime.GOOS
@@ -193,7 +193,7 @@ func downloadTemurin17() (string, string, error) {
 	url := "https://api.adoptium.net/v3/binary/latest/17/ga/" + adoptOs + "/" + adoptArch + "/jdk/hotspot/normal/eclipse"
 
 	home, _ := os.UserHomeDir()
-	dlDir := filepath.Join(home, ".angrboda", "jdk", "downloads")
+	dlDir := filepath.Join(home, ".skoll", "jdk", "downloads")
 	if err := os.MkdirAll(dlDir, 0755); err != nil {
 		return "", "", err
 	}
@@ -205,7 +205,7 @@ func downloadTemurin17() (string, string, error) {
 	if err := downloadFileProgress(url, archive, "Eclipse Temurin 17"); err != nil {
 		return "", "", err
 	}
-	tmpDir := filepath.Join(home, ".angrboda", "jdk", "tmp-extract")
+	tmpDir := filepath.Join(home, ".skoll", "jdk", "tmp-extract")
 	_ = os.RemoveAll(tmpDir)
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		return "", "", err
@@ -235,7 +235,7 @@ func downloadTemurin17() (string, string, error) {
 	if root == "" {
 		return "", "", fmt.Errorf("downloaded Temurin 17 but bin/%s was not found after extract", exe)
 	}
-	dest := angrbodaJDKHome()
+	dest := skollJDKHome()
 	_ = os.RemoveAll(dest)
 	if err := os.Rename(root, dest); err != nil {
 		return "", "", err
@@ -251,26 +251,26 @@ func downloadTemurin17() (string, string, error) {
 	return bin, dest, nil
 }
 
-func angrbodaPlatformToolsDir() string {
+func skollPlatformToolsDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".angrboda", "platform-tools")
+	return filepath.Join(home, ".skoll", "platform-tools")
 }
 
 // findAdb returns (adbPath, source). source is one of "system",
-// "angrboda", or "" when adb is nowhere to be found. It never downloads
+// "skoll", or "" when adb is nowhere to be found. It never downloads
 // anything — use ensureAdb for that.
 func findAdb() (string, string) {
 	if p, err := lookPath("adb"); err == nil {
 		return p, "system"
 	}
-	if p := filepath.Join(angrbodaPlatformToolsDir(), adbExeName()); fileExists(p) {
-		return p, "angrboda"
+	if p := filepath.Join(skollPlatformToolsDir(), adbExeName()); fileExists(p) {
+		return p, "skoll"
 	}
 	return "", ""
 }
 
 // ensureAdb makes sure `adb` is available: system / SDK copy wins,
-// else the angrboda cache, else Google's platform-tools zip is
+// else the skoll cache, else Google's platform-tools zip is
 // downloaded once. It adds the platform-tools dir to PATH.
 func ensureAdb() {
 	if p, _ := findAdb(); p != "" {
@@ -288,14 +288,14 @@ func ensureAdb() {
 }
 
 // downloadPlatformTools downloads the platform-tools zip for this OS
-// from Google and extracts it to ~/.angrboda/platform-tools/.
+// from Google and extracts it to ~/.skoll/platform-tools/.
 // It returns the path to adb.
 func downloadPlatformTools() (string, error) {
 	osName := runtime.GOOS // linux, windows, darwin — Google's names as-is.
 	url := "https://dl.google.com/android/repository/platform-tools-latest-" + osName + ".zip"
 
 	home, _ := os.UserHomeDir()
-	dlDir := filepath.Join(home, ".angrboda", "downloads")
+	dlDir := filepath.Join(home, ".skoll", "downloads")
 	if err := os.MkdirAll(dlDir, 0755); err != nil {
 		return "", err
 	}
@@ -304,11 +304,11 @@ func downloadPlatformTools() (string, error) {
 		return "", err
 	}
 	// The zip holds a top-level platform-tools/ dir; extract it
-	// straight into ~/.angrboda/ so it lands at ~/.angrboda/platform-tools/.
-	if err := unzip(archive, filepath.Join(home, ".angrboda")); err != nil {
+	// straight into ~/.skoll/ so it lands at ~/.skoll/platform-tools/.
+	if err := unzip(archive, filepath.Join(home, ".skoll")); err != nil {
 		return "", err
 	}
-	adb := filepath.Join(angrbodaPlatformToolsDir(), adbExeName())
+	adb := filepath.Join(skollPlatformToolsDir(), adbExeName())
 	if runtime.GOOS != "windows" {
 		_ = os.Chmod(adb, 0755)
 	}

@@ -12,7 +12,7 @@ import (
 )
 
 // Flutter SDK auto-install. A system Flutter wins; otherwise the
-// latest stable SDK is downloaded once to ~/.angrboda/flutter/ and
+// latest stable SDK is downloaded once to ~/.skoll/flutter/ and
 // added to PATH for the child processes. Nothing here needs Android
 // Studio — but a Flutter build still needs the Android SDK, which
 // ensureAndroidSdk installs (see sdk.go).
@@ -23,7 +23,7 @@ const flutterPinnedVersion = "3.50.1"
 
 func flutterSdkDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".angrboda", "flutter")
+	return filepath.Join(home, ".skoll", "flutter")
 }
 
 func flutterBin() string {
@@ -34,19 +34,19 @@ func flutterBin() string {
 	return filepath.Join(flutterSdkDir(), "bin", name)
 }
 
-// findFlutter returns (flutterBin, source): "system", "angrboda", or "".
+// findFlutter returns (flutterBin, source): "system", "skoll", or "".
 func findFlutter() (string, string) {
 	if p, err := lookPath("flutter"); err == nil {
 		return p, "system"
 	}
 	if p := flutterBin(); fileExists(p) {
-		return p, "angrboda"
+		return p, "skoll"
 	}
 	return "", ""
 }
 
 // ensureFlutter makes sure `flutter` is available: a system Flutter
-// wins, else the angrboda cache, else the latest stable SDK is
+// wins, else the skoll cache, else the latest stable SDK is
 // downloaded once (~800 MB) and added to PATH.
 func ensureFlutter() {
 	if p, _ := findFlutter(); p != "" {
@@ -154,7 +154,7 @@ func installFlutterSdk(ver, archive string) error {
 	}
 	url := "https://storage.googleapis.com/flutter_infra_release/releases/stable/" + osName + "/" + archive
 	home, _ := os.UserHomeDir()
-	dlDir := filepath.Join(home, ".angrboda", "downloads")
+	dlDir := filepath.Join(home, ".skoll", "downloads")
 	if err := os.MkdirAll(dlDir, 0755); err != nil {
 		return err
 	}

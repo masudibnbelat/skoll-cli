@@ -49,8 +49,8 @@ func gradlewName() string {
 //     downloads and uses the exact wrapper version.
 //  2. A local install of the exact wrapper version:
 //     ~/.local/opt/gradle-<ver>/bin/gradle, ~/.gradle/wrapper/dists/...,
-//     or the angrboda cache ~/.angrboda/gradle/gradle-<ver>/bin/gradle.
-//  3. Auto-download that exact version once into the angrboda cache.
+//     or the skoll cache ~/.skoll/gradle/gradle-<ver>/bin/gradle.
+//  3. Auto-download that exact version once into the skoll cache.
 //
 // The Gradle on PATH is never used when the wrapper wants another
 // version — that is the bug that broke AGP 8.x projects with 9.x.
@@ -110,7 +110,7 @@ func findLocalGradle(ver string) string {
 	if home != "" {
 		candidates = append(candidates,
 			filepath.Join(home, ".local", "opt", "gradle-"+ver, "bin", exe),
-			filepath.Join(home, ".angrboda", "gradle", "gradle-"+ver, "bin", exe),
+			filepath.Join(home, ".skoll", "gradle", "gradle-"+ver, "bin", exe),
 		)
 		// Gradle's own wrapper cache: ~/.gradle/wrapper/dists/gradle-<ver>-bin/<hash>/gradle-<ver>/bin/gradle
 		glob := filepath.Join(home, ".gradle", "wrapper", "dists", "gradle-"+ver+"-bin", "*", "gradle-"+ver, "bin", exe)
@@ -142,16 +142,16 @@ func findLocalGradle(ver string) string {
 
 func gradleCacheDir(ver string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".angrboda", "gradle", "gradle-"+ver)
+	return filepath.Join(home, ".skoll", "gradle", "gradle-"+ver)
 }
 
 // downloadGradle downloads gradle-<ver>-bin.zip from services.gradle.org
-// and extracts it to ~/.angrboda/gradle/gradle-<ver>/, then returns the
+// and extracts it to ~/.skoll/gradle/gradle-<ver>/, then returns the
 // path to bin/gradle (or bin/gradle.bat on Windows).
 func downloadGradle(ver string) (string, error) {
 	url := "https://services.gradle.org/distributions/gradle-" + ver + "-bin.zip"
 	home, _ := os.UserHomeDir()
-	dlDir := filepath.Join(home, ".angrboda", "gradle", "downloads")
+	dlDir := filepath.Join(home, ".skoll", "gradle", "downloads")
 	if err := os.MkdirAll(dlDir, 0755); err != nil {
 		return "", err
 	}
@@ -160,7 +160,7 @@ func downloadGradle(ver string) (string, error) {
 		return "", err
 	}
 	dest := gradleCacheDir(ver)
-	if err := unzip(zipPath, filepath.Join(home, ".angrboda", "gradle")); err != nil {
+	if err := unzip(zipPath, filepath.Join(home, ".skoll", "gradle")); err != nil {
 		return "", err
 	}
 	exe := filepath.Join(dest, "bin", gradleExeName())

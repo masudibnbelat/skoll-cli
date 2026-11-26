@@ -11,7 +11,7 @@ func TestCopyExecutable(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src")
 	dst := filepath.Join(dir, "dst")
-	if err := os.WriteFile(src, []byte("hello angrboda"), 0644); err != nil {
+	if err := os.WriteFile(src, []byte("hello skoll"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := copyExecutable(src, dst); err != nil {
@@ -21,8 +21,8 @@ func TestCopyExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "hello angrboda" {
-		t.Fatalf("dst = %q, want hello angrboda", got)
+	if string(got) != "hello skoll" {
+		t.Fatalf("dst = %q, want hello skoll", got)
 	}
 	if st, err := os.Stat(dst); err != nil {
 		t.Fatal(err)

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Latest STABLE versions for `angrboda new`: looked up live, so a
+// Latest STABLE versions for `skoll new`: looked up live, so a
 // project created today always uses today's latest stable stack.
 // Maven's <release> field cannot be trusted here — it currently
 // points at an AGP alpha (9.6.0-alpha06) and a Kotlin RC

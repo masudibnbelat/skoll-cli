@@ -21,8 +21,8 @@ var updateCheck bool
 
 var updateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update angrboda itself to the latest release",
-	Long: `Checks the latest angrboda release on GitHub and, when a newer
+	Short: "Update skoll itself to the latest release",
+	Long: `Checks the latest skoll release on GitHub and, when a newer
 version exists, downloads the matching binary, verifies its SHA256
 against the release checksums, and replaces the current binary.
 With --check it only reports whether an update exists.
@@ -48,7 +48,7 @@ func cmdUpdate(checkOnly bool) {
 		okLine("You have v" + version + ", newer than the latest release (" + latest + ") — nothing to update.")
 		return
 	} else if cmp == 0 {
-		okLine("angrboda " + version + " is already the latest (" + latest + ").")
+		okLine("skoll " + version + " is already the latest (" + latest + ").")
 		return
 	}
 	stepLine("Update available: " + latest + " (you have v" + version + ")")
@@ -56,14 +56,14 @@ func cmdUpdate(checkOnly bool) {
 		return
 	}
 	asset := updateAssetName()
-	url := "https://github.com/masudibnbelat/angrboda-cli/releases/download/" + latest + "/" + asset
-	tmpDir, err := os.MkdirTemp("", "angrboda-update-*")
+	url := "https://github.com/masudibnbelat/skoll-cli/releases/download/" + latest + "/" + asset
+	tmpDir, err := os.MkdirTemp("", "skoll-update-*")
 	if err != nil {
 		die(err.Error())
 	}
 	defer os.RemoveAll(tmpDir)
 	tmpBin := filepath.Join(tmpDir, asset)
-	if err := downloadFileProgress(url, tmpBin, "angrboda "+latest); err != nil {
+	if err := downloadFileProgress(url, tmpBin, "skoll "+latest); err != nil {
 		die("could not download " + url + " (" + err.Error() + ")")
 	}
 	if err := verifyChecksum(tmpBin, latest, asset); err != nil {
@@ -73,11 +73,11 @@ func cmdUpdate(checkOnly bool) {
 	if err := replaceCurrentBinary(tmpBin); err != nil {
 		die("could not replace the current binary (" + err.Error() + "). If it lives in a protected folder, reinstall with the installer instead.")
 	}
-	okLine("Updated to " + latest + " — run `angrboda --version` to confirm.")
+	okLine("Updated to " + latest + " — run `skoll --version` to confirm.")
 }
 
 func updateAssetName() string {
-	name := "angrboda-" + runtime.GOOS + "-" + runtime.GOARCH
+	name := "skoll-" + runtime.GOOS + "-" + runtime.GOARCH
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
@@ -93,7 +93,7 @@ func latestReleaseTag() (string, error) {
 			return http.ErrUseLastResponse
 		},
 	}
-	resp, err := client.Get("https://github.com/masudibnbelat/angrboda-cli/releases/latest")
+	resp, err := client.Get("https://github.com/masudibnbelat/skoll-cli/releases/latest")
 	if err == nil {
 		defer resp.Body.Close()
 		if loc := resp.Header.Get("Location"); loc != "" {
@@ -103,7 +103,7 @@ func latestReleaseTag() (string, error) {
 		}
 	}
 	// Fallback: the API (GITHUB_TOKEN honoured when set).
-	req, _ := http.NewRequest("GET", "https://api.github.com/repos/masudibnbelat/angrboda-cli/releases/latest", nil)
+	req, _ := http.NewRequest("GET", "https://api.github.com/repos/masudibnbelat/skoll-cli/releases/latest", nil)
 	if tok := os.Getenv("GITHUB_TOKEN"); tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
@@ -130,7 +130,7 @@ func latestReleaseTag() (string, error) {
 // verifyChecksum downloads checksums.txt for the release and checks
 // the binary's SHA256 against it.
 func verifyChecksum(binPath, tag, asset string) error {
-	url := "https://github.com/masudibnbelat/angrboda-cli/releases/download/" + tag + "/checksums.txt"
+	url := "https://github.com/masudibnbelat/skoll-cli/releases/download/" + tag + "/checksums.txt"
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -199,7 +199,7 @@ func copyExecutable(src, dst string) error {
 		return err
 	}
 	defer in.Close()
-	tmp, err := os.CreateTemp(filepath.Dir(dst), ".angrboda-update-*")
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".skoll-update-*")
 	if err != nil {
 		return err
 	}

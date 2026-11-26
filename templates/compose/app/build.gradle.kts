@@ -8,8 +8,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Release signing: `angrboda build --release` / `angrboda release`
-// create a release keystore once (~/.angrboda/keystore/) and write
+// Release signing: `skoll build --release` / `skoll release`
+// create a release keystore once (~/.skoll/keystore/) and write
 // its path + passwords into local.properties (gitignored). Without
 // those four keys the release APK is built unsigned.
 // NOTE: do NOT use java.util.Properties() here — in a Gradle Kotlin

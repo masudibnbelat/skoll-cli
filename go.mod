@@ -1,4 +1,4 @@
-module github.com/masudibnbelat/angrboda-cli
+module github.com/masudibnbelat/skoll-cli
 
 go 1.23
 

@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Flags for `angrboda build` and `angrboda run`, bound in init() below.
+// Flags for `skoll build` and `skoll run`, bound in init() below.
 var (
 	buildRelease bool
 	buildClean   bool
@@ -28,7 +28,7 @@ The APK is copied to <project>/apk/<project>-debug.apk (or -release.apk).
 For a Flutter project it runs ` + "`flutter build apk`" + ` instead.
 For a library project it builds the .aar instead (to <project>/aar/).
 A release build is signed: the release keystore is created once if
-needed (see angrboda keystore).
+needed (see skoll keystore).
 With --bundle it builds the App Bundle (.aab) for Google Play
 instead, to <project>/bundle/<project>-release.aab
 (` + "`flutter build appbundle`" + ` for Flutter). A library project
@@ -126,10 +126,10 @@ func mustGradle(root string) string {
 }
 
 func cmdDoctor() {
-	fmt.Println("angrboda " + version + " — environment check")
+	fmt.Println("skoll " + version + " — environment check")
 	fmt.Println("ANDROID_HOME: " + os.Getenv("ANDROID_HOME"))
-	// Java and adb are reported from where angrboda would actually use
-	// them (system first, angrboda cache second). Doctor never downloads
+	// Java and adb are reported from where skoll would actually use
+	// them (system first, skoll cache second). Doctor never downloads
 	// anything — the install happens on the first build / run.
 	if bin, _, src := findJava(); bin != "" {
 		doctorLine("java", bin+" ("+src+")", true)
@@ -157,7 +157,7 @@ func cmdDoctor() {
 	if p, err := lookPath("git"); err == nil {
 		doctorLine("git", p, true)
 	} else {
-		doctorLine("git", "MISSING (needed for `angrboda release`)", false)
+		doctorLine("git", "MISSING (needed for `skoll release`)", false)
 	}
 	if p, err := lookPath("gh"); err == nil {
 		if _, err := runCapture("gh", "auth", "status"); err == nil {
@@ -166,7 +166,7 @@ func cmdDoctor() {
 			doctorLine("gh", p+" (NOT logged in — run: gh auth login)", false)
 		}
 	} else {
-		doctorLine("gh", "MISSING (needed for `angrboda release`)", false)
+		doctorLine("gh", "MISSING (needed for `skoll release`)", false)
 	}
 	if _, err := lookPath("gradle"); err == nil {
 		doctorLine("gradle", "on PATH (only the wrapper version is used)", true)
@@ -278,7 +278,7 @@ func cmdDevices() {
 func cmdBuild(release, clean, bundle bool) {
 	// Build only — never install. assembleDebug needs no phone and no adb.
 	// (installDebug would fail with "No connected devices!" when no phone
-	// is plugged in, so it belongs to `angrboda run` only, not to `angrboda build`.)
+	// is plugged in, so it belongs to `skoll run` only, not to `skoll build`.)
 	start := time.Now()
 	root := mustRoot()
 	if err := os.Chdir(root); err != nil {
@@ -334,7 +334,7 @@ func cmdBuild(release, clean, bundle bool) {
 	if bundle {
 		// The .aab is signed with the same signing config as the
 		// APK, so there is no separate signature check here — the
-		// APK check in `angrboda build --release` / `angrboda
+		// APK check in `skoll build --release` / `skoll
 		// release` is what proves the config works.
 		dest, err := copyBuiltBundle(root, variant)
 		if err != nil {
@@ -638,7 +638,7 @@ func cmdRun(clean, release bool, device string) {
 		return
 	}
 	if isLibraryProject(root) {
-		die(filepath.Base(root) + " is a library project — nothing to install or launch. Use `angrboda build` to make the .aar.")
+		die(filepath.Base(root) + " is a library project — nothing to install or launch. Use `skoll build` to make the .aar.")
 	}
 	task := "installDebug"
 	variant := "debug"
@@ -670,7 +670,7 @@ func cmdRun(clean, release bool, device string) {
 	if err := runLiveEnv(gradle, env, append(gradleArgs(), task)...); err != nil {
 		die("build/install failed.")
 	}
-	// Same as `angrboda build`: copy the APK to <project>/apk/ too.
+	// Same as `skoll build`: copy the APK to <project>/apk/ too.
 	// A release run is checked as well: an unsigned APK cannot have
 	// installed (installRelease fails first), but a debug-signed one
 	// installs fine — and the user should know they just ran a
@@ -748,7 +748,7 @@ func cmdUninstall() {
 	}
 	pkg := findPackage(root)
 	if pkg == "" {
-		die("package name not found — build once first (angrboda build).")
+		die("package name not found — build once first (skoll build).")
 	}
 	ensureAdb()
 	serial, err := pickDevice("")

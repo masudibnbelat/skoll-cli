@@ -11,14 +11,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Automatic update notice: every angrboda command (except update,
+// Automatic update notice: every skoll command (except update,
 // version, help and completion) shows a small box when a newer
 // release exists — so the user never has to remember to check.
 // The latest release is re-checked at most every 6 hours, in the
 // background, so the check never slows a command down and never
 // fails one: the notice comes from the cached result, and an
 // offline machine just shows nothing. Set
-// ANGRBODA_NO_UPDATE_CHECK=1 to turn it off entirely.
+// SKOLL_NO_UPDATE_CHECK=1 to turn it off entirely.
 
 // updateCheckInterval: how often the latest release is re-checked.
 const updateCheckInterval = 6 * time.Hour
@@ -30,7 +30,7 @@ type updateCache struct {
 
 func updateCachePath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".angrboda", "update-check.json")
+	return filepath.Join(home, ".skoll", "update-check.json")
 }
 
 func readUpdateCache(path string) updateCache {
@@ -91,7 +91,7 @@ var skipUpdateNotice = map[string]bool{
 // PersistentPreRun, so before every command except the skipped
 // ones — and never on a piped run, so scripts stay clean.
 func maybeNotifyUpdate(cmd *cobra.Command) {
-	if os.Getenv("ANGRBODA_NO_UPDATE_CHECK") != "" {
+	if os.Getenv("SKOLL_NO_UPDATE_CHECK") != "" {
 		return
 	}
 	if skipUpdateNotice[cmd.Name()] {
@@ -127,13 +127,13 @@ func refreshUpdateCacheAsync(path string) {
 //
 //	─────────────────────────────────────────────
 //	✨  Update available: v0.8.1  (you have v0.8.0)
-//	    Run `angrboda update` to install it.
+//	    Run `skoll update` to install it.
 //	─────────────────────────────────────────────
 func printUpdateNotice(latest string) {
 	rule := dim(strings.Repeat("─", 45))
 	fmt.Println()
 	fmt.Println(rule)
 	fmt.Println(yellow("✨") + "  Update available: " + green(latest) + dim("  (you have v"+version+")"))
-	fmt.Println(dim("    Run `angrboda update` to install it."))
+	fmt.Println(dim("    Run `skoll update` to install it."))
 	fmt.Println(rule)
 }

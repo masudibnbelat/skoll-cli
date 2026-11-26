@@ -145,7 +145,7 @@ func TestKeystoreExportImport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	javaHome := filepath.Join(realHome, ".angrboda", "jdk", "temurin-17")
+	javaHome := filepath.Join(realHome, ".skoll", "jdk", "temurin-17")
 	if _, err := os.Stat(filepath.Join(javaHome, "bin", "keytool")); err != nil {
 		t.Skip("no Temurin keytool at " + javaHome)
 	}

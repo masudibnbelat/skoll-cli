@@ -9,7 +9,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Release signing: `angrboda build --release` / `angrboda release`
+// Release signing: `skoll build --release` / `skoll release`
 // create a release keystore once and write android/key.properties
 // (gitignored). Without it the release APK is signed with the debug key.
 // NOTE: do NOT use java.util.Properties() here — in a Gradle Kotlin

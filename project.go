@@ -77,14 +77,14 @@ func findProjectRoot() (string, error) {
 }
 
 // isFlutterProject reports whether root is a Flutter project
-// (created by `angrboda new --type flutter`): a pubspec.yaml at
+// (created by `skoll new --type flutter`): a pubspec.yaml at
 // the project root marks it.
 func isFlutterProject(root string) bool {
 	return fileExists(filepath.Join(root, "pubspec.yaml"))
 }
 
 // isLibraryProject reports whether root is an Android library project
-// (created by `angrboda new --type library`): some module applies
+// (created by `skoll new --type library`): some module applies
 // com.android.library and no module applies com.android.application.
 func isLibraryProject(root string) bool {
 	hasLib, hasApp := false, false

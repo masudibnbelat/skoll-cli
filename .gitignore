@@ -1,7 +1,7 @@
-/angrboda
-/angrboda.exe
-/angrboda-linux-amd64
-/angrboda-windows-amd64.exe
+/skoll
+/skoll.exe
+/skoll-linux-amd64
+/skoll-windows-amd64.exe
 /dist/
 *.apk
 

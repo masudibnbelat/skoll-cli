@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Flags for `angrboda release`, bound in init() below.
+// Flags for `skoll release`, bound in init() below.
 var (
 	releaseMajor  bool
 	releaseMinor  bool
@@ -40,7 +40,7 @@ as v1.0.1, not v0.0.1.
 
 A dirty tree stops the release unless --yes is given. If the build
 or the checks fail, the local tag is removed again so you can
-retry. The release APK is signed (see angrboda keystore),
+retry. The release APK is signed (see skoll keystore),
 and its versionName stamp and signature are checked before upload.
 With --bundle the App Bundle (.aab) for Google Play is built and
 uploaded too — new apps on Google Play need an .aab, not an .apk.`,
@@ -344,7 +344,7 @@ func cmdRelease(args []string) {
 	// undoing the commit would be wrong when --yes released a dirty
 	// tree with the user's other changes in it.)
 
-	// Same as `angrboda build`: copy the artifact to <project>/apk/
+	// Same as `skoll build`: copy the artifact to <project>/apk/
 	// (or /aar) too (copy, not move — the original stays where the
 	// build put it), and to ~/<repo>-<tag>.apk/.aar for upload.
 	// With --bundle the App Bundle is built and uploaded too (the

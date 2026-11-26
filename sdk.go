@@ -141,7 +141,7 @@ func installAndroidSdk(dir string, api int) error {
 		return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 	}
 	url := "https://dl.google.com/android/repository/" + zipName
-	dlDir := filepath.Join(dir, ".angrboda-downloads")
+	dlDir := filepath.Join(dir, ".skoll-downloads")
 	if err := os.MkdirAll(dlDir, 0755); err != nil {
 		return err
 	}

@@ -78,7 +78,7 @@ func pickDevice(want string) (string, error) {
 	}
 	// Only prompt when stdin is a terminal.
 	if fi, _ := os.Stdin.Stat(); fi == nil || (fi.Mode()&os.ModeCharDevice) == 0 {
-		return "", fmt.Errorf("pass one with: angrboda run --device SERIAL")
+		return "", fmt.Errorf("pass one with: skoll run --device SERIAL")
 	}
 	fmt.Fprintf(os.Stderr, "Pick one [1-%d]: ", len(devs))
 	reader := bufio.NewReader(os.Stdin)

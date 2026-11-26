@@ -14,11 +14,11 @@ import (
 // Release signing.
 //
 // A release APK that is not signed cannot be installed on a phone, so
-// `angrboda build --release` and `angrboda release` make sure the
+// `skoll build --release` and `skoll release` make sure the
 // project can sign before they build:
 //
 //   - One release keystore is created once, shared by all the user's
-//     apps, at ~/.angrboda/keystore/release.keystore (alias "release").
+//     apps, at ~/.skoll/keystore/release.keystore (alias "release").
 //     Its passwords live next to it in release.properties (0600).
 //   - The project is pointed at it: local.properties gets
 //     releaseStoreFile / releaseStorePassword / releaseKeyAlias /
@@ -32,12 +32,12 @@ import (
 //
 // Losing the keystore means the app can never be updated on Google
 // Play again, so every creation prints a BACK UP warning, and
-// `angrboda keystore` shows the path + fingerprints + the same warning.
+// `skoll keystore` shows the path + fingerprints + the same warning.
 
 var keystoreCmd = &cobra.Command{
 	Use:   "keystore",
 	Short: "Show the release keystore (creates it if missing)",
-	Long: `Shows the release keystore angrboda signs release builds with:
+	Long: `Shows the release keystore skoll signs release builds with:
 its path, alias and SHA-1 / SHA-256 fingerprints (the ones Google
 Play and Firebase ask for). If no keystore exists yet, one is
 created first (keytool, RSA 2048, valid 10000 days).
@@ -47,8 +47,8 @@ can never be updated on Google Play again — a new keystore signs a
 different app as far as the Play Store is concerned.
 
 Move the keystore to another machine with:
-  angrboda keystore export <folder>   (copies keystore + passwords)
-  angrboda keystore import <folder>   (copies them back in)`,
+  skoll keystore export <folder>   (copies keystore + passwords)
+  skoll keystore import <folder>   (copies them back in)`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdKeystore()
@@ -61,7 +61,7 @@ var keystoreExportCmd = &cobra.Command{
 	Long: `Copies release.keystore and release.properties into <folder>
 (the folder is created if needed). Keep that folder safe — it
 holds the passwords. On the other machine, run
-` + "`angrboda keystore import <folder>`" + ` to put them back.`,
+` + "`skoll keystore import <folder>`" + ` to put them back.`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdKeystoreExport(args[0])
@@ -70,9 +70,9 @@ holds the passwords. On the other machine, run
 
 var keystoreImportCmd = &cobra.Command{
 	Use:   "import <folder>",
-	Short: "Copy a keystore + passwords back in (from `angrboda keystore export`)",
+	Short: "Copy a keystore + passwords back in (from `skoll keystore export`)",
 	Long: `Copies release.keystore and release.properties from <folder>
-into ~/.angrboda/keystore/, so this machine signs with the same key
+into ~/.skoll/keystore/, so this machine signs with the same key
 as the machine the keystore came from. It refuses when a keystore
 already exists here — delete it first if you really want to replace
 it (and be sure: the old key can never be recovered).`,
@@ -88,7 +88,7 @@ func init() {
 
 func keystoreDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".angrboda", "keystore")
+	return filepath.Join(home, ".skoll", "keystore")
 }
 
 func releaseKeystorePath() string {
@@ -199,7 +199,7 @@ func updatePropsFile(path string, updates map[string]string) {
 }
 
 // findKeytool finds keytool (ships with every JDK): JAVA_HOME first,
-// then the angrboda Temurin install, then PATH.
+// then the skoll Temurin install, then PATH.
 func findKeytool() string {
 	if jh := os.Getenv("JAVA_HOME"); jh != "" {
 		p := filepath.Join(jh, "bin", "keytool")
@@ -211,7 +211,7 @@ func findKeytool() string {
 		}
 	}
 	home, _ := os.UserHomeDir()
-	matches, _ := filepath.Glob(filepath.Join(home, ".angrboda", "jdk", "*", "bin", "keytool"))
+	matches, _ := filepath.Glob(filepath.Join(home, ".skoll", "jdk", "*", "bin", "keytool"))
 	if len(matches) > 0 {
 		sort.Strings(matches)
 		return matches[len(matches)-1]
@@ -367,11 +367,11 @@ func cmdKeystoreExport(dir string) {
 		}
 	}
 	okLine("Keystore exported to " + dir + " (release.keystore + release.properties)")
-	warnLine("Keep this folder safe — it holds the keystore passwords. On the other machine: angrboda keystore import " + dir)
+	warnLine("Keep this folder safe — it holds the keystore passwords. On the other machine: skoll keystore import " + dir)
 }
 
 // cmdKeystoreImport copies the keystore + its passwords from dir
-// back into ~/.angrboda/keystore/. It refuses when a keystore
+// back into ~/.skoll/keystore/. It refuses when a keystore
 // already exists here: replacing the signing key silently would
 // break Play Store updates for every app signed with the old one.
 func cmdKeystoreImport(dir string) {
@@ -381,7 +381,7 @@ func cmdKeystoreImport(dir string) {
 	for _, name := range []string{"release.keystore", "release.properties"} {
 		src := filepath.Join(dir, name)
 		if _, err := os.Stat(src); err != nil {
-			die("missing " + src + " — that folder is not a keystore export (run `angrboda keystore export` on the other machine first).")
+			die("missing " + src + " — that folder is not a keystore export (run `skoll keystore export` on the other machine first).")
 		}
 	}
 	if err := os.MkdirAll(keystoreDir(), 0o700); err != nil {
@@ -432,7 +432,7 @@ func certIsDebug(dn string) bool {
 // and prints the signer certificate, returning an error when it is
 // not signed, or signed with the debug key. An unsigned release APK
 // cannot be installed, so a failed check stops the release (and
-// `angrboda build --release`). When apksigner is missing it warns
+// `skoll build --release`). When apksigner is missing it warns
 // and skips, like the aapt stamp check does.
 func verifyApkSigned(apk string) error {
 	apksigner := findApksigner()

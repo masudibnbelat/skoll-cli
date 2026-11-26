@@ -66,7 +66,7 @@ func TestEnsureReleaseKeystore(t *testing.T) {
 		t.Fatal(err)
 	}
 	// keytool from the real Temurin install, so no Java download happens.
-	javaHome := filepath.Join(realHome, ".angrboda", "jdk", "temurin-17")
+	javaHome := filepath.Join(realHome, ".skoll", "jdk", "temurin-17")
 	if _, err := os.Stat(filepath.Join(javaHome, "bin", "keytool")); err != nil {
 		t.Skip("no Temurin keytool at " + javaHome)
 	}
@@ -86,14 +86,14 @@ func TestEnsureReleaseKeystore(t *testing.T) {
 	if props["releaseKeyAlias"] != "release" {
 		t.Fatalf("alias = %q, want release", props["releaseKeyAlias"])
 	}
-	ksPath := filepath.Join(tmpHome, ".angrboda", "keystore", "release.keystore")
+	ksPath := filepath.Join(tmpHome, ".skoll", "keystore", "release.keystore")
 	if _, err := os.Stat(ksPath); err != nil {
 		t.Fatalf("keystore was not created at %s: %v", ksPath, err)
 	}
 	if props["releaseStoreFile"] != ksPath {
 		t.Fatalf("releaseStoreFile = %q, want %q", props["releaseStoreFile"], ksPath)
 	}
-	shared := readPropsFile(filepath.Join(tmpHome, ".angrboda", "keystore", "release.properties"))
+	shared := readPropsFile(filepath.Join(tmpHome, ".skoll", "keystore", "release.properties"))
 	if shared["storePassword"] == "" || shared["keyPassword"] == "" {
 		t.Fatalf("release.properties is missing passwords: %v", shared)
 	}

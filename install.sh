@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# angrboda installer for Linux (and macOS).
+# skoll installer for Linux (and macOS).
 # Usage — paste this one line in a terminal:
-#   curl -fsSL https://raw.githubusercontent.com/masudibnbelat/angrboda-cli/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/masudibnbelat/skoll-cli/main/install.sh | bash
 #
 # What it does:
-#   1. Finds the latest GitHub Release of masudibnbelat/angrboda-cli.
+#   1. Finds the latest GitHub Release of masudibnbelat/skoll-cli.
 #   2. Downloads the matching binary (linux-amd64 or linux-arm64).
-#   3. Installs it to ~/.local/bin/angrboda and makes it executable.
+#   3. Installs it to ~/.local/bin/skoll and makes it executable.
 #   4. Makes sure ~/.local/bin is on PATH (adds it to ~/.bashrc / ~/.zshrc).
 set -e
-REPO="masudibnbelat/angrboda-cli"
+REPO="masudibnbelat/skoll-cli"
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 
@@ -21,12 +21,12 @@ case "$ARCH" in
   *) echo "STOP: unsupported architecture: $ARCH"; exit 1 ;;
 esac
 case "$OS" in
-  linux) ASSET="angrboda-linux-$ARCH" ;;
-  darwin) ASSET="angrboda-darwin-$ARCH" ;;
+  linux) ASSET="skoll-linux-$ARCH" ;;
+  darwin) ASSET="skoll-darwin-$ARCH" ;;
   *) echo "STOP: this script is for Linux/macOS. On Windows use install.ps1 in PowerShell."; exit 1 ;;
 esac
 
-echo "== angrboda: finding latest release of $REPO"
+echo "== skoll: finding latest release of $REPO"
 # The GitHub web redirect gives the latest tag with no API call, so
 # it never hits the unauthenticated API rate limit (60/hour per IP —
 # that is what a 403 from api.github.com means). Fall back to the
@@ -44,9 +44,9 @@ fi
 echo "== latest: $TAG — downloading $ASSET"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-curl -fsSL -o "$TMP/angrboda" "https://github.com/$REPO/releases/download/$TAG/$ASSET"
-chmod +x "$TMP/angrboda"
-cp "$TMP/angrboda" "$BIN_DIR/angrboda"
+curl -fsSL -o "$TMP/skoll" "https://github.com/$REPO/releases/download/$TAG/$ASSET"
+chmod +x "$TMP/skoll"
+cp "$TMP/skoll" "$BIN_DIR/skoll"
 
 # Make sure ~/.local/bin is on PATH for future shells.
 for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
@@ -56,9 +56,9 @@ for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
 done
 export PATH="$BIN_DIR:$PATH"
 
-echo "== DONE: angrboda $TAG installed to $BIN_DIR/angrboda"
-angrboda --version
+echo "== DONE: skoll $TAG installed to $BIN_DIR/skoll"
+skoll --version
 echo "Try it in any Android project:"
 echo "  cd <your-project>   # e.g. MyApp"
-echo "  angrboda run"
-echo "  angrboda release v1.5.0 \"notes\""
+echo "  skoll run"
+echo "  skoll release v1.5.0 \"notes\""
