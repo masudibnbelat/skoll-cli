@@ -45,16 +45,16 @@ func cmdUpdate(checkOnly bool) {
 		die("could not find the latest release (" + err.Error() + "). Check your internet, or wait out GitHub's rate limit.")
 	}
 	if cmp := compareVersions(strings.TrimPrefix(latest, "v"), version); cmp < 0 {
-		fmt.Println(green("✓") + " You have " + bold("v"+version) + ", newer than the latest release (" + latest + ") — nothing to update.")
+		fmt.Println(green("✓") + " You have " + bold(green("v"+version)) + green(", newer than the latest release") + dim(" ("+latest+") — nothing to update."))
 		return
 	} else if cmp == 0 {
-		fmt.Println(green("✓") + " " + bold("skoll "+version) + " is already the latest (" + latest + ").")
+		fmt.Println(green("✓") + " " + bold(green("skoll "+version)) + green(" is already the latest") + dim(" ("+latest+")."))
 		return
 	}
-	printBox([]string{
-		cyan("↑") + "  Update available: " + bold(green(latest)),
-		"  You have " + bold("v"+version) + dim("  →  "+latest),
-	})
+	printBoxColor([]string{
+		yellow("↑") + "  " + bold(yellow("Update available:")) + " " + bold(green(latest)),
+		"  You have " + yellow("v"+version) + " " + cyan("→") + " " + bold(green(latest)),
+	}, yellow)
 	if checkOnly {
 		return
 	}
@@ -77,8 +77,8 @@ func cmdUpdate(checkOnly bool) {
 		die("could not replace the current binary (" + err.Error() + "). If it lives in a protected folder, reinstall with the installer instead.")
 	}
 	printBox([]string{
-		green("✓") + "  Updated to " + bold(green(latest)),
-		dim("  Run `skoll --version` to confirm."),
+		green("✓") + "  " + green("Updated to ") + bold(green(latest)),
+		"  " + dim("Run ") + cyan("skoll --version") + dim(" to confirm."),
 	})
 }
 

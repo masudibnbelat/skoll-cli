@@ -132,8 +132,8 @@ func refreshUpdateCacheAsync(path string) {
 //	└───────────────────────────────────────────────┘
 func printUpdateNotice(latest string) {
 	fmt.Println()
-	printBox([]string{
-		yellow("✨") + "  Update available: " + bold(green(latest)) + dim("  (you have v"+version+")"),
+	printBoxColor([]string{
+		yellow("✨") + "  " + bold(yellow("Update available:")) + " " + bold(green(latest)) + dim("  (you have v"+version+")"),
 		"    Run " + cyan("skoll update") + dim(" to install it."),
-	})
+	}, yellow)
 }

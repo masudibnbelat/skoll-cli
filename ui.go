@@ -87,32 +87,39 @@ func visibleLen(s string) int {
 //
 // Plain (no colors) when piped; the box is still drawn.
 func printBox(lines []string) {
+	printBoxColor(lines, green)
+}
+
+// printBoxColor prints lines inside a box with the given border
+// color: green for success (created, updated), yellow for
+// "attention" (an update is waiting). Plain when piped.
+func printBoxColor(lines []string, border func(string) string) {
 	width := 0
 	for _, l := range lines {
 		if v := visibleLen(l); v > width {
 			width = v
 		}
 	}
-	fmt.Println(green("┌" + strings.Repeat("─", width+2) + "┐"))
+	fmt.Println(border("┌" + strings.Repeat("─", width+2) + "┐"))
 	for _, l := range lines {
-		fmt.Println(green("│") + " " + l + strings.Repeat(" ", width-visibleLen(l)) + " " + green("│"))
+		fmt.Println(border("│") + " " + l + strings.Repeat(" ", width-visibleLen(l)) + " " + border("│"))
 	}
-	fmt.Println(green("└" + strings.Repeat("─", width+2) + "┘"))
+	fmt.Println(border("└" + strings.Repeat("─", width+2) + "┘"))
 }
 
-// stepLine prints a "now doing" line: → msg
+// stepLine prints a "now doing" line: → msg, in cyan.
 func stepLine(msg string) {
-	fmt.Println(cyan("→") + " " + msg)
+	fmt.Println(cyan("→") + " " + cyan(msg))
 }
 
-// okLine prints a finished line: ✓ msg
+// okLine prints a finished line: ✓ msg, in green.
 func okLine(msg string) {
-	fmt.Println(green("✓") + " " + msg)
+	fmt.Println(green("✓") + " " + green(msg))
 }
 
-// warnLine prints a warning line: ⚠ msg
+// warnLine prints a warning line: ⚠ msg, in yellow.
 func warnLine(msg string) {
-	fmt.Println(yellow("⚠") + " " + msg)
+	fmt.Println(yellow("⚠") + " " + yellow(msg))
 }
 
 // doctorLine prints one environment-check line: ✓ label: value (green)
@@ -188,7 +195,7 @@ func progressLine(written, total int64, speed float64, eta time.Duration) string
 		speedStr = formatBytes(int64(speed)) + "/s"
 		etaStr = "ETA " + formatDuration(eta)
 	}
-	return fmt.Sprintf("%s  %3d%%  %s / %s  %s  %s", bar, pct, formatBytes(written), formatBytes(total), speedStr, etaStr)
+	return fmt.Sprintf("%s  %s  %s / %s  %s  %s", bar, bold(fmt.Sprintf("%3d%%", pct)), formatBytes(written), formatBytes(total), speedStr, etaStr)
 }
 
 // progressLineUnknown renders the live line when the total size is
@@ -247,5 +254,5 @@ func (b *downloadBar) finish(written int64) {
 	if elapsed >= time.Second && written > 0 {
 		avg = " (" + formatBytes(int64(float64(written)/elapsed.Seconds())) + "/s)"
 	}
-	fmt.Fprintf(os.Stdout, "%s %s downloaded — %s in %s%s\n", green("✓"), b.label, formatBytes(written), formatDuration(elapsed), avg)
+	fmt.Fprintf(os.Stdout, "%s %s %s — %s in %s%s\n", green("✓"), bold(b.label), green("downloaded"), formatBytes(written), formatDuration(elapsed), dim(avg))
 }
