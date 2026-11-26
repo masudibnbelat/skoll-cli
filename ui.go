@@ -1,3 +1,4 @@
+// Location: ui.go
 package main
 
 import (
@@ -30,12 +31,14 @@ func colorEnabled() bool {
 }
 
 const (
-	ansiReset  = "\x1b[0m"
-	ansiGreen  = "\x1b[32m"
-	ansiCyan   = "\x1b[36m"
-	ansiYellow = "\x1b[33m"
-	ansiRed    = "\x1b[31m"
-	ansiDim    = "\x1b[2m"
+	ansiReset   = "\x1b[0m"
+	ansiBold    = "\x1b[1m"
+	ansiGreen   = "\x1b[32m"
+	ansiCyan    = "\x1b[36m"
+	ansiYellow  = "\x1b[33m"
+	ansiRed     = "\x1b[31m"
+	ansiMagenta = "\x1b[35m"
+	ansiDim     = "\x1b[2m"
 )
 
 func paint(code, s string) string {
@@ -45,11 +48,57 @@ func paint(code, s string) string {
 	return code + s + ansiReset
 }
 
-func green(s string) string  { return paint(ansiGreen, s) }
-func cyan(s string) string   { return paint(ansiCyan, s) }
-func yellow(s string) string { return paint(ansiYellow, s) }
-func red(s string) string    { return paint(ansiRed, s) }
-func dim(s string) string    { return paint(ansiDim, s) }
+func green(s string) string   { return paint(ansiGreen, s) }
+func cyan(s string) string    { return paint(ansiCyan, s) }
+func yellow(s string) string  { return paint(ansiYellow, s) }
+func red(s string) string     { return paint(ansiRed, s) }
+func magenta(s string) string { return paint(ansiMagenta, s) }
+func bold(s string) string    { return paint(ansiBold, s) }
+func dim(s string) string     { return paint(ansiDim, s) }
+
+// visibleLen counts the characters a line takes on screen, ignoring
+// ANSI escape sequences, so padding works on colored lines too.
+func visibleLen(s string) int {
+	n := 0
+	inEsc := false
+	for _, r := range s {
+		if r == '\x1b' {
+			inEsc = true
+			continue
+		}
+		if inEsc {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				inEsc = false
+			}
+			continue
+		}
+		n++
+	}
+	return n
+}
+
+// printBox prints lines inside a green box:
+//
+//	┌──────────────────────────────────┐
+//	│ ✓ Created MyApp in MyApp (42 files) │
+//	│ Package: com.example.myapp       │
+//	│ Next: cd MyApp && angrboda build │
+//	└──────────────────────────────────┘
+//
+// Plain (no colors) when piped; the box is still drawn.
+func printBox(lines []string) {
+	width := 0
+	for _, l := range lines {
+		if v := visibleLen(l); v > width {
+			width = v
+		}
+	}
+	fmt.Println(green("┌" + strings.Repeat("─", width+2) + "┐"))
+	for _, l := range lines {
+		fmt.Println(green("│") + " " + l + strings.Repeat(" ", width-visibleLen(l)) + " " + green("│"))
+	}
+	fmt.Println(green("└" + strings.Repeat("─", width+2) + "┘"))
+}
 
 // stepLine prints a "now doing" line: → msg
 func stepLine(msg string) {

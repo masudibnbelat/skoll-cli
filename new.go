@@ -53,7 +53,7 @@ var flutterTemplate embed.FS
 var emptyTemplate embed.FS
 
 // The Library starter template: one Android library module, no app.
-// Builds an .aar with `skoll build`.
+// Builds an .aar with `angrboda build`.
 //
 //go:embed templates/library
 var libraryTemplate embed.FS
@@ -81,17 +81,19 @@ the package name (the example is shown; press Enter to accept it):
 
   Project name: MyApp
   Project type:
-    1) Kotlin (Compose + Material 3)
-    2) Flutter
-    3) Empty (Kotlin, no Compose)
-    4) Library (Android .aar)
-  Choose [1]:
+    ❯ Kotlin (Compose + Material 3)
+      Flutter
+      Empty (Kotlin, no Compose)
+      Library (Android .aar)
   Package name [com.example.myapp]:
 
+The type is picked with ↑ ↓ + Enter (or press 1-4); when stdin
+is piped it falls back to typing a number.
+
 Give the name on the command line to skip the first question:
-skoll new MyApp. Give -t flutter for a Flutter project, -p
+angrboda new MyApp. Give -t flutter for a Flutter project, -p
 for your own package, to skip the questions. To create a project
-in the current folder instead, use ` + "`skoll init`" + `.
+in the current folder instead, use ` + "`angrboda init`" + `.
 
 A Kotlin project always uses the latest stable versions (Kotlin,
 AGP, Gradle, Compose BOM are looked up when you run it; pinned
@@ -99,7 +101,7 @@ versions are used when there is no internet). Pin one with
 --gradle, --agp, --kotlin or --bom. A Flutter project uses
 Flutter's own pinned versions instead (Gradle 9.5.0, AGP 9.3.1,
 Kotlin 2.4.20, Dart ^3.14.0) — Flutter only supports those combos.
-Build it with: cd <name> && skoll build`,
+Build it with: cd <name> && angrboda build`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdNew(args)
@@ -110,9 +112,9 @@ var initCmd = &cobra.Command{
 	Use:   "init [name]",
 	Short: "Create a project in this folder",
 	Long: `Creates a new Android project in the current folder, instead
-of a new subfolder like ` + "`skoll new`" + ` does. The project
+of a new subfolder like ` + "`angrboda new`" + ` does. The project
 name defaults to the folder's name; the type and package questions
-are the same as ` + "`skoll new`" + `.
+are the same as ` + "`angrboda new`" + `.
 
 The folder must be empty (a .git folder is fine) — init never
 writes over existing files.`,
@@ -159,7 +161,7 @@ func prompt(reader *bufio.Reader, label string) string {
 func appIDFromName(name string) string {
 	appID := nonAlnumRe.ReplaceAllString(name, "")
 	if appID == "" {
-		die("name must contain at least one letter or digit: skoll new MyApp")
+		die("name must contain at least one letter or digit: angrboda new MyApp")
 	}
 	if appID[0] >= '0' && appID[0] <= '9' {
 		appID = "App" + appID
@@ -168,26 +170,44 @@ func appIDFromName(name string) string {
 }
 
 // askProjectType resolves the project type: the -t flag wins,
-// otherwise it asks. "lib" is accepted for "library".
+// otherwise it asks with an arrow-key menu — ↑ ↓ to move, Enter to
+// select, 1-4 to jump, j/k also move, Esc to cancel. When stdin is
+// piped, or the terminal cannot do raw mode, it falls back to
+// typing a number, so scripts keep working. "lib" is accepted for
+// "library".
 func askProjectType(reader *bufio.Reader) string {
 	projType := strings.ToLower(strings.TrimSpace(newType))
 	if projType == "" {
-		fmt.Println("Project type:")
-		fmt.Println("  1) Kotlin (Compose + Material 3)")
-		fmt.Println("  2) Flutter")
-		fmt.Println("  3) Empty (Kotlin, no Compose)")
-		fmt.Println("  4) Library (Android .aar)")
-		switch strings.ToLower(prompt(reader, "Choose [1]: ")) {
-		case "", "1", "kotlin", "k":
-			projType = "kotlin"
-		case "2", "flutter", "f":
-			projType = "flutter"
-		case "3", "empty", "e":
-			projType = "empty"
-		case "4", "library", "lib", "l":
-			projType = "library"
-		default:
-			die("pick 1 for Kotlin, 2 for Flutter, 3 for Empty or 4 for Library: skoll new MyApp")
+		choices := []selectChoice{
+			{label: "Kotlin", desc: "Compose + Material 3", value: "kotlin", accent: magenta},
+			{label: "Flutter", desc: "Dart + Material", value: "flutter", accent: cyan},
+			{label: "Empty", desc: "Kotlin, no Compose", value: "empty", accent: dim},
+			{label: "Library", desc: "Android .aar", value: "library", accent: yellow},
+		}
+		idx, err := selectOne(reader, "Project type", choices)
+		if err == nil {
+			projType = choices[idx].value
+		} else if err == errCancelled {
+			die("cancelled — nothing created.")
+		} else {
+			// Not a terminal (piped / CI) — the old typed question.
+			fmt.Println("Project type:")
+			fmt.Println("  1) Kotlin (Compose + Material 3)")
+			fmt.Println("  2) Flutter")
+			fmt.Println("  3) Empty (Kotlin, no Compose)")
+			fmt.Println("  4) Library (Android .aar)")
+			switch strings.ToLower(prompt(reader, "Choose [1]: ")) {
+			case "", "1", "kotlin", "k":
+				projType = "kotlin"
+			case "2", "flutter", "f":
+				projType = "flutter"
+			case "3", "empty", "e":
+				projType = "empty"
+			case "4", "library", "lib", "l":
+				projType = "library"
+			default:
+				die("pick 1 for Kotlin, 2 for Flutter, 3 for Empty or 4 for Library: angrboda new MyApp")
+			}
 		}
 	}
 	if projType == "lib" {
@@ -211,7 +231,7 @@ func askPackage(reader *bufio.Reader, appID string) string {
 	defaultPkg := "com.example." + strings.ToLower(appID)
 	pkg := newPackage
 	if pkg == "" {
-		pkg = prompt(reader, "Package name ["+defaultPkg+"]: ")
+		pkg = prompt(reader, "Package name ["+cyan(defaultPkg)+"]: ")
 		if pkg == "" {
 			pkg = defaultPkg
 		}
@@ -326,22 +346,23 @@ func writeTemplate(templateFS embed.FS, templateRoot string, replacements []stru
 	return written
 }
 
+// printCreated prints the result in a green box, then the note for
+// library / flutter projects (those lines are too long for the box).
 func printCreated(name, out, projType, pkg string, written int) {
-	okLine(fmt.Sprintf("Created %s in %s (%d files)", name, out, written))
-	fmt.Println("Package: " + pkg)
-	next := "cd " + out + " && skoll build"
+	next := "cd " + out + " && angrboda build"
 	if out == "." {
-		next = "skoll build"
+		next = "angrboda build"
 	}
+	printBox([]string{
+		green("✓") + " Created " + name + " in " + out + " (" + strconv.Itoa(written) + " files)",
+		"Package: " + pkg,
+		"Next: " + next,
+	})
 	switch projType {
 	case "library":
-		fmt.Println("Library project — `skoll build` makes the .aar; there is no app to run.")
-		fmt.Println("Next: " + next)
+		fmt.Println("Library project — `angrboda build` makes the .aar; there is no app to run.")
 	case "flutter":
-		fmt.Println("Next: " + next)
 		fmt.Println("Note: needs the Flutter SDK — `flutter --version` should work first. Android only; add other platforms later with `flutter create --platforms=ios .`.")
-	default:
-		fmt.Println("Next: " + next)
 	}
 }
 
@@ -353,9 +374,9 @@ func cmdNew(args []string) {
 	}
 	// Step 1 — project name.
 	if name == "" {
-		name = prompt(reader, "Project name: ")
+		name = prompt(reader, cyan("Project name: "))
 		if name == "" {
-			die("give the app a name: skoll new MyApp")
+			die("give the app a name: angrboda new MyApp")
 		}
 	}
 	appID := appIDFromName(name)
@@ -385,7 +406,7 @@ func cmdInit(args []string) {
 		name = strings.TrimSpace(args[0])
 	}
 	if name == "" || name == "/" || name == "." {
-		die("could not use this folder's name — give one: skoll init MyApp")
+		die("could not use this folder's name — give one: angrboda init MyApp")
 	}
 	appID := appIDFromName(name)
 	// The folder must be empty (a .git folder is fine) — init never
