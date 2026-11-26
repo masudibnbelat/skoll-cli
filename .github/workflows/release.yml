@@ -1,3 +1,4 @@
+# Location: .github/workflows/release.yml
 name: Release
 on:
   push:
@@ -14,6 +15,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+      - name: Check version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VER=$(sed -n 's/^[[:space:]]*const version = "\(.*\)"/\1/p' main.go)
+          if [ "$TAG" != "$VER" ]; then
+            echo "::error::Tag v$TAG does not match main.go const version $VER — bump main.go to $TAG first, then tag again"
+            exit 1
+          fi
+          echo "Version $VER matches tag v$TAG"
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
