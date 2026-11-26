@@ -4,7 +4,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -28,7 +27,7 @@ val hasReleaseKey = listOf(
 
 android {
     namespace = "{{Package}}"
-    compileSdk = 36
+    compileSdk = {{CompileSdk}}
 
     signingConfigs {
         if (hasReleaseKey) {

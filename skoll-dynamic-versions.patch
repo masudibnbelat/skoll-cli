@@ -1,0 +1,135 @@
+--- a/versions.go
++++ b/versions.go
+@@ -19,11 +19,12 @@
+ // fails), the pinned versions below are used — the set this template
+ // was verified with.
+ type appVersions struct {
+-	gradle string
+-	agp    string
+-	kotlin string
+-	bom    string
+-	live   int // how many of the 4 were fetched live
++	gradle     string
++	agp        string
++	kotlin     string
++	bom        string
++	compileSdk int // compileSdk for new projects, derived from the BOM
++	live       int // how many of the 4 were fetched live
+ }
+ 
+ var pinnedVersions = appVersions{
+@@ -45,6 +46,19 @@
+ 
+ var versionRe = regexp.MustCompile(`^[0-9][0-9A-Za-z.\-+]*$`)
+ 
++// compileSdkForBom returns the compileSdk a Compose BOM needs.
++// Known breakpoint: 2026 BOMs (Compose 1.13 / Material 3 1.5 /
++// core-ktx 1.19) require compileSdk 37, while the 2025 BOMs build
++// against 36. When a future BOM needs a newer SDK, add its
++// breakpoint here — `skoll new` then picks it up automatically,
++// and `skoll run` installs that platform (see sdk.go).
++func compileSdkForBom(bom string) int {
++	if bom >= "2026.01.01" {
++		return 37
++	}
++	return 36
++}
++
+ func resolveLatestVersions() appVersions {
+ 	v := pinnedVersions
+ 	client := &http.Client{Timeout: 5 * time.Second}
+@@ -64,13 +78,14 @@
+ 		v.bom = s
+ 		v.live++
+ 	}
++	v.compileSdk = compileSdkForBom(v.bom)
+ 	return v
+ }
+ 
+ // describe says which versions will be used, and whether they are
+ // live or the offline pinned set.
+ func (v appVersions) describe() string {
+-	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, Compose BOM %s", v.gradle, v.agp, v.kotlin, v.bom)
++	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, Compose BOM %s, compileSdk %d", v.gradle, v.agp, v.kotlin, v.bom, v.compileSdk)
+ 	switch {
+ 	case v.live == 4:
+ 		return "Latest versions: " + base
+@@ -84,7 +99,7 @@
+ // describeWithoutBom is describe() without the Compose BOM part,
+ // for the empty and library templates, which do not use Compose.
+ func (v appVersions) describeWithoutBom() string {
+-	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s", v.gradle, v.agp, v.kotlin)
++	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, compileSdk %d", v.gradle, v.agp, v.kotlin, v.compileSdk)
+ 	switch {
+ 	case v.live == 4:
+ 		return "Latest versions: " + base
+@@ -123,6 +138,7 @@
+ 		}
+ 		v.bom = newBomPin
+ 	}
++	v.compileSdk = compileSdkForBom(v.bom)
+ 	return v
+ }
+ 
+--- a/sdk.go
++++ b/sdk.go
+@@ -81,6 +81,29 @@
+ 	return 36
+ }
+ 
++// ensurePlatformInstalled installs the Android platform (and
++// matching build-tools) for api when it is missing from an
++// otherwise existing SDK. A no-op when the platform is already
++// there or when there is no sdkmanager to install it with —
++// Gradle then reports the missing platform itself.
++func ensurePlatformInstalled(dir string, api int) {
++	platformDir := filepath.Join(dir, "platforms", fmt.Sprintf("android-%d", api))
++	if st, err := os.Stat(platformDir); err == nil && st.IsDir() {
++		return
++	}
++	sdkman := sdkmanagerPath(dir)
++	if !fileExists(sdkman) {
++		return
++	}
++	stepLine(fmt.Sprintf("Android platform android-%d not installed — installing it…", api))
++	pkgs := []string{fmt.Sprintf("platforms;android-%d", api), fmt.Sprintf("build-tools;%d.0.0", api)}
++	args := append([]string{"--sdk_root=" + dir}, pkgs...)
++	if err := runSdkmanagerYes(sdkman, args...); err != nil {
++		die("could not install Android platform " + strconv.Itoa(api) + " (" + err.Error() + "). Install it with sdkmanager and retry.")
++	}
++	okLine(fmt.Sprintf("Android platform android-%d ready", api))
++}
++
+ // ensureAndroidSdk makes sure the Android SDK exists: an existing
+ // SDK is used as-is, otherwise it is installed once. It sets
+ // ANDROID_HOME / ANDROID_SDK_ROOT + PATH for the child processes.
+@@ -100,6 +123,11 @@
+ 				die("could not install the Android SDK (" + err.Error() + "). Install Android Studio once yourself, or set ANDROID_HOME to an existing SDK and retry.")
+ 			}
+ 		}
++		// The SDK exists, but the platform this project needs may
++		// not: a project created with a newer BOM needs a newer
++		// compileSdk, and its platform is installed here instead
++		// of failing later in Gradle.
++		ensurePlatformInstalled(dir, sdkApiLevel(root))
+ 		applySdkEnv(dir)
+ 		return
+ 	}
+--- a/new.go
++++ b/new.go
+@@ -26,6 +26,7 @@
+ //	{{AgpVersion}}        — e.g. 9.1.1
+ //	{{KotlinVersion}}     — e.g. 2.2.10
+ //	{{ComposeBomVersion}} — e.g. 2025.09.00
++//	{{CompileSdk}}        — e.g. 37 (from the Compose BOM; see compileSdkForBom)
+ //
+ // The Kotlin files live under com/example/app/ in the template; that
+ // path segment is replaced with the real package path on generation.
+@@ -269,6 +270,7 @@
+ 		{"{{AgpVersion}}", vers.agp},
+ 		{"{{KotlinVersion}}", vers.kotlin},
+ 		{"{{ComposeBomVersion}}", vers.bom},
++		{"{{CompileSdk}}", strconv.Itoa(vers.compileSdk)},
+ 	}
+ }
+ 

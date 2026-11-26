@@ -4,7 +4,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 // Release signing: `skoll build --release` / `skoll release`
@@ -27,7 +26,7 @@ val hasReleaseKey = listOf(
 
 android {
     namespace = "{{Package}}"
-    compileSdk = 36
+    compileSdk = {{CompileSdk}}
 
     signingConfigs {
         if (hasReleaseKey) {

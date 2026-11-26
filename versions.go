@@ -19,11 +19,12 @@ import (
 // fails), the pinned versions below are used — the set this template
 // was verified with.
 type appVersions struct {
-	gradle string
-	agp    string
-	kotlin string
-	bom    string
-	live   int // how many of the 4 were fetched live
+	gradle     string
+	agp        string
+	kotlin     string
+	bom        string
+	compileSdk int // compileSdk for new projects, derived from the BOM
+	live       int // how many of the 4 were fetched live
 }
 
 var pinnedVersions = appVersions{
@@ -45,6 +46,19 @@ var flutterPinnedVersions = appVersions{
 
 var versionRe = regexp.MustCompile(`^[0-9][0-9A-Za-z.\-+]*$`)
 
+// compileSdkForBom returns the compileSdk a Compose BOM needs.
+// Known breakpoint: 2026 BOMs (Compose 1.13 / Material 3 1.5 /
+// core-ktx 1.19) require compileSdk 37, while the 2025 BOMs build
+// against 36. When a future BOM needs a newer SDK, add its
+// breakpoint here — `skoll new` then picks it up automatically,
+// and `skoll run` installs that platform (see sdk.go).
+func compileSdkForBom(bom string) int {
+	if bom >= "2026.01.01" {
+		return 37
+	}
+	return 36
+}
+
 func resolveLatestVersions() appVersions {
 	v := pinnedVersions
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -64,13 +78,14 @@ func resolveLatestVersions() appVersions {
 		v.bom = s
 		v.live++
 	}
+	v.compileSdk = compileSdkForBom(v.bom)
 	return v
 }
 
 // describe says which versions will be used, and whether they are
 // live or the offline pinned set.
 func (v appVersions) describe() string {
-	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, Compose BOM %s", v.gradle, v.agp, v.kotlin, v.bom)
+	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, Compose BOM %s, compileSdk %d", v.gradle, v.agp, v.kotlin, v.bom, v.compileSdk)
 	switch {
 	case v.live == 4:
 		return "Latest versions: " + base
@@ -84,7 +99,7 @@ func (v appVersions) describe() string {
 // describeWithoutBom is describe() without the Compose BOM part,
 // for the empty and library templates, which do not use Compose.
 func (v appVersions) describeWithoutBom() string {
-	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s", v.gradle, v.agp, v.kotlin)
+	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, compileSdk %d", v.gradle, v.agp, v.kotlin, v.compileSdk)
 	switch {
 	case v.live == 4:
 		return "Latest versions: " + base
@@ -123,6 +138,7 @@ func applyVersionPins(v appVersions) appVersions {
 		}
 		v.bom = newBomPin
 	}
+	v.compileSdk = compileSdkForBom(v.bom)
 	return v
 }
 

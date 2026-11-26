@@ -26,6 +26,7 @@ import (
 //	{{AgpVersion}}        — e.g. 9.1.1
 //	{{KotlinVersion}}     — e.g. 2.2.10
 //	{{ComposeBomVersion}} — e.g. 2025.09.00
+//	{{CompileSdk}}        — e.g. 37 (from the Compose BOM; see compileSdkForBom)
 //
 // The Kotlin files live under com/example/app/ in the template; that
 // path segment is replaced with the real package path on generation.
@@ -289,6 +290,7 @@ func replacementsFor(name, appID, pkg string, vers appVersions) []struct{ old, n
 		{"{{AgpVersion}}", vers.agp},
 		{"{{KotlinVersion}}", vers.kotlin},
 		{"{{ComposeBomVersion}}", vers.bom},
+		{"{{CompileSdk}}", strconv.Itoa(vers.compileSdk)},
 	}
 }
 

@@ -81,6 +81,29 @@ func sdkApiLevel(root string) int {
 	return 36
 }
 
+// ensurePlatformInstalled installs the Android platform (and
+// matching build-tools) for api when it is missing from an
+// otherwise existing SDK. A no-op when the platform is already
+// there or when there is no sdkmanager to install it with —
+// Gradle then reports the missing platform itself.
+func ensurePlatformInstalled(dir string, api int) {
+	platformDir := filepath.Join(dir, "platforms", fmt.Sprintf("android-%d", api))
+	if st, err := os.Stat(platformDir); err == nil && st.IsDir() {
+		return
+	}
+	sdkman := sdkmanagerPath(dir)
+	if !fileExists(sdkman) {
+		return
+	}
+	stepLine(fmt.Sprintf("Android platform android-%d not installed — installing it…", api))
+	pkgs := []string{fmt.Sprintf("platforms;android-%d", api), fmt.Sprintf("build-tools;%d.0.0", api)}
+	args := append([]string{"--sdk_root=" + dir}, pkgs...)
+	if err := runSdkmanagerYes(sdkman, args...); err != nil {
+		die("could not install Android platform " + strconv.Itoa(api) + " (" + err.Error() + "). Install it with sdkmanager and retry.")
+	}
+	okLine(fmt.Sprintf("Android platform android-%d ready", api))
+}
+
 // ensureAndroidSdk makes sure the Android SDK exists: an existing
 // SDK is used as-is, otherwise it is installed once. It sets
 // ANDROID_HOME / ANDROID_SDK_ROOT + PATH for the child processes.
@@ -100,6 +123,11 @@ func ensureAndroidSdk(root string) {
 				die("could not install the Android SDK (" + err.Error() + "). Install Android Studio once yourself, or set ANDROID_HOME to an existing SDK and retry.")
 			}
 		}
+		// The SDK exists, but the platform this project needs may
+		// not: a project created with a newer BOM needs a newer
+		// compileSdk, and its platform is installed here instead
+		// of failing later in Gradle.
+		ensurePlatformInstalled(dir, sdkApiLevel(root))
 		applySdkEnv(dir)
 		return
 	}
