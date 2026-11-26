@@ -82,7 +82,7 @@ func visibleLen(s string) int {
 //	┌──────────────────────────────────┐
 //	│ ✓ Created MyApp in MyApp (42 files) │
 //	│ Package: com.example.myapp       │
-//	│ Next: cd MyApp && angrboda build │
+//	│ Next: cd MyApp && skoll build │
 //	└──────────────────────────────────┘
 //
 // Plain (no colors) when piped; the box is still drawn.

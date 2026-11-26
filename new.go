@@ -53,7 +53,7 @@ var flutterTemplate embed.FS
 var emptyTemplate embed.FS
 
 // The Library starter template: one Android library module, no app.
-// Builds an .aar with `angrboda build`.
+// Builds an .aar with `skoll build`.
 //
 //go:embed templates/library
 var libraryTemplate embed.FS
@@ -91,9 +91,9 @@ The type is picked with ↑ ↓ + Enter (or press 1-4); when stdin
 is piped it falls back to typing a number.
 
 Give the name on the command line to skip the first question:
-angrboda new MyApp. Give -t flutter for a Flutter project, -p
+skoll new MyApp. Give -t flutter for a Flutter project, -p
 for your own package, to skip the questions. To create a project
-in the current folder instead, use ` + "`angrboda init`" + `.
+in the current folder instead, use ` + "`skoll init`" + `.
 
 A Kotlin project always uses the latest stable versions (Kotlin,
 AGP, Gradle, Compose BOM are looked up when you run it; pinned
@@ -101,7 +101,7 @@ versions are used when there is no internet). Pin one with
 --gradle, --agp, --kotlin or --bom. A Flutter project uses
 Flutter's own pinned versions instead (Gradle 9.5.0, AGP 9.3.1,
 Kotlin 2.4.20, Dart ^3.14.0) — Flutter only supports those combos.
-Build it with: cd <name> && angrboda build`,
+Build it with: cd <name> && skoll build`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		cmdNew(args)
@@ -112,9 +112,9 @@ var initCmd = &cobra.Command{
 	Use:   "init [name]",
 	Short: "Create a project in this folder",
 	Long: `Creates a new Android project in the current folder, instead
-of a new subfolder like ` + "`angrboda new`" + ` does. The project
+of a new subfolder like ` + "`skoll new`" + ` does. The project
 name defaults to the folder's name; the type and package questions
-are the same as ` + "`angrboda new`" + `.
+are the same as ` + "`skoll new`" + `.
 
 The folder must be empty (a .git folder is fine) — init never
 writes over existing files.`,
@@ -161,7 +161,7 @@ func prompt(reader *bufio.Reader, label string) string {
 func appIDFromName(name string) string {
 	appID := nonAlnumRe.ReplaceAllString(name, "")
 	if appID == "" {
-		die("name must contain at least one letter or digit: angrboda new MyApp")
+		die("name must contain at least one letter or digit: skoll new MyApp")
 	}
 	if appID[0] >= '0' && appID[0] <= '9' {
 		appID = "App" + appID
@@ -206,7 +206,7 @@ func askProjectType(reader *bufio.Reader) string {
 			case "4", "library", "lib", "l":
 				projType = "library"
 			default:
-				die("pick 1 for Kotlin, 2 for Flutter, 3 for Empty or 4 for Library: angrboda new MyApp")
+				die("pick 1 for Kotlin, 2 for Flutter, 3 for Empty or 4 for Library: skoll new MyApp")
 			}
 		}
 	}
@@ -349,9 +349,9 @@ func writeTemplate(templateFS embed.FS, templateRoot string, replacements []stru
 // printCreated prints the result in a green box, then the note for
 // library / flutter projects (those lines are too long for the box).
 func printCreated(name, out, projType, pkg string, written int) {
-	next := "cd " + out + " && angrboda build"
+	next := "cd " + out + " && skoll build"
 	if out == "." {
-		next = "angrboda build"
+		next = "skoll build"
 	}
 	printBox([]string{
 		green("✓") + " Created " + name + " in " + out + " (" + strconv.Itoa(written) + " files)",
@@ -360,7 +360,7 @@ func printCreated(name, out, projType, pkg string, written int) {
 	})
 	switch projType {
 	case "library":
-		fmt.Println("Library project — `angrboda build` makes the .aar; there is no app to run.")
+		fmt.Println("Library project — `skoll build` makes the .aar; there is no app to run.")
 	case "flutter":
 		fmt.Println("Note: needs the Flutter SDK — `flutter --version` should work first. Android only; add other platforms later with `flutter create --platforms=ios .`.")
 	}
@@ -376,7 +376,7 @@ func cmdNew(args []string) {
 	if name == "" {
 		name = prompt(reader, cyan("Project name: "))
 		if name == "" {
-			die("give the app a name: angrboda new MyApp")
+			die("give the app a name: skoll new MyApp")
 		}
 	}
 	appID := appIDFromName(name)
@@ -406,7 +406,7 @@ func cmdInit(args []string) {
 		name = strings.TrimSpace(args[0])
 	}
 	if name == "" || name == "/" || name == "." {
-		die("could not use this folder's name — give one: angrboda init MyApp")
+		die("could not use this folder's name — give one: skoll init MyApp")
 	}
 	appID := appIDFromName(name)
 	// The folder must be empty (a .git folder is fine) — init never

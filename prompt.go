@@ -200,8 +200,9 @@ func redrawMenu(title string, choices []selectChoice, selected int, total int) {
 	renderMenu(title, choices, selected)
 }
 
-// clearMenu erases the menu block, leaving the cursor where the
-// confirmation line goes.
+// clearMenu erases the menu block and leaves the cursor on its
+// FIRST line, so the confirmation line takes the menu's place
+// instead of printing below the empty block.
 func clearMenu(total int) {
 	fmt.Fprintf(os.Stdout, "\x1b[%dA", total)
 	for i := 0; i < total; i++ {
@@ -209,6 +210,14 @@ func clearMenu(total int) {
 		if i < total-1 {
 			fmt.Fprint(os.Stdout, "\r\n")
 		}
+	}
+	// The cursor is on the block's last line now — the old code
+	// printed the confirmation here, leaving the cleared lines
+	// above it as a blank gap. Move back to the first line so
+	// the confirmation replaces the menu and the lines after
+	// it fill the rows below.
+	if total > 1 {
+		fmt.Fprintf(os.Stdout, "\x1b[%dA", total-1)
 	}
 	fmt.Fprint(os.Stdout, "\r")
 }
