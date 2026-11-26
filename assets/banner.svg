@@ -1,3 +1,4 @@
+<!-- Location: assets/banner.svg -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-label="skoll banner">
   <rect width="1280" height="360" fill="#0d0d0d"/>
   <rect x="40" y="32" width="1200" height="296" rx="16" fill="#141414" stroke="#2e2e2e" stroke-width="1.5"/>
@@ -5,7 +6,7 @@
   <circle cx="106" cy="66" r="7" fill="#5a5a5a"/>
   <circle cx="134" cy="66" r="7" fill="#7a7a7a"/>
   <text x="164" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="17" fill="#8a8a8a">skoll — terminal</text>
-  <text x="76" y="182" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="86" font-weight="bold" fill="#ffffff">skoll</text>
+  <text x="76" y="182" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="86" font-weight="bold" fill="#ffffff">Skoll</text>
   <text x="78" y="226" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="24" fill="#a3a3a3">Build it. Run it. Release it. One command each.</text>
   <text x="76" y="290" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="21" fill="#ffffff"><tspan font-weight="bold">$ </tspan>skoll run<tspan fill="#8a8a8a">  -&gt;  app installed &amp; opened</tspan></text>
   <rect x="1062" y="98" width="104" height="192" rx="20" fill="#0d0d0d" stroke="#444444" stroke-width="1.5"/>
