@@ -1,3 +1,4 @@
+// Location: versions.go
 package main
 
 import (
@@ -57,6 +58,14 @@ func compileSdkForBom(bom string) int {
 		return 37
 	}
 	return 36
+}
+
+// fallbackCompileSdk is the compileSdk of the pinned (verified) BOM.
+// sdk.go falls back to it when the latest platform cannot be
+// installed on the user's machine, instead of leaving a project
+// that can never build.
+func fallbackCompileSdk() int {
+	return compileSdkForBom(pinnedVersions.bom)
 }
 
 func resolveLatestVersions() appVersions {
