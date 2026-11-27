@@ -39,6 +39,44 @@ import (
 const cmdlineToolsBuild = "14742923"
 const cmdlineToolsVersion = "20.0"
 
+// winBatCmd builds the command to run a program on Windows the way
+// cmd.exe needs it. A .bat/.cmd file (sdkmanager.bat, gradlew.bat,
+// flutter.bat) runs through cmd.exe, and cmd's /c parsing strips the
+// outermost quotes — so a path with a space in it ("C:\Users\Royal
+// Academy\...") is split at the space and fails with
+// "'C:\Users\Royal' is not recognized as an internal or external
+// command". Wrapping the whole command in one more pair of quotes
+// keeps the quoted .bat path and any space-containing argument
+// intact. Non-Windows and non-.bat programs run exactly as before.
+func winBatCmd(name string, args ...string) *exec.Cmd {
+	if runtime.GOOS != "windows" {
+		return exec.Command(name, args...)
+	}
+	prog := name
+	if p, err := exec.LookPath(name); err == nil {
+		prog = p
+	}
+	if !strings.EqualFold(filepath.Ext(prog), ".bat") && !strings.EqualFold(filepath.Ext(prog), ".cmd") {
+		return exec.Command(name, args...)
+	}
+	var b strings.Builder
+	b.WriteString(quoteWinArg(prog))
+	for _, a := range args {
+		b.WriteByte(' ')
+		b.WriteString(quoteWinArg(a))
+	}
+	return exec.Command("cmd.exe", "/c", `"`+b.String()+`"`)
+}
+
+// quoteWinArg quotes one command-line argument for cmd.exe: wrap in
+// double quotes when it contains a space, tab or quote.
+func quoteWinArg(s string) string {
+	if strings.ContainsAny(s, " \t\"") {
+		return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`
+	}
+	return s
+}
+
 // defaultSdkDir: ANDROID_HOME / ANDROID_SDK_ROOT, else the usual
 // default (~/Android/Sdk, or %LOCALAPPDATA%\Android\Sdk on Windows).
 func defaultSdkDir() string {
@@ -475,7 +513,7 @@ func installAndroidSdk(dir string, spec string) error {
 // license prompt (the `yes | sdkmanager` equivalent, portable to
 // Windows where there is no `yes` command).
 func runSdkmanagerYes(sdkman string, args ...string) error {
-	cmd := exec.Command(sdkman, args...)
+	cmd := winBatCmd(sdkman, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	stdin, err := cmd.StdinPipe()

@@ -19,7 +19,7 @@ func runLive(name string, args ...string) error {
 }
 
 func runLiveEnv(name string, extraEnv []string, args ...string) error {
-	cmd := exec.Command(name, args...)
+	cmd := winBatCmd(name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -31,7 +31,7 @@ func runLiveEnv(name string, extraEnv []string, args ...string) error {
 
 // runCapture runs a command and returns its combined stdout.
 func runCapture(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
+	cmd := winBatCmd(name, args...)
 	out, err := cmd.Output()
 	return string(out), err
 }
