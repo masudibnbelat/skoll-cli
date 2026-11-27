@@ -1,0 +1,10 @@
+--- a/new.go
++++ b/new.go
+@@ -269,7 +269,7 @@
+ 		{"{{AgpVersion}}", vers.agp},
+ 		{"{{KotlinVersion}}", vers.kotlin},
+ 		{"{{ComposeBomVersion}}", vers.bom},
+-		{"{{CompileSdk}}", strconv.Itoa(vers.compileSdk)},
++		{"{{CompileSdkBlock}}", vers.compileSdkBlock()},
+ 	}
+ }

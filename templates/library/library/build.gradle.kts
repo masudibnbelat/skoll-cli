@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "{{Package}}"
-    compileSdk = {{CompileSdk}}
+    {{CompileSdkBlock}}
 
     defaultConfig {
         minSdk = {{MinSdk}}

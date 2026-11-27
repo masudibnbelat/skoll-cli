@@ -24,8 +24,8 @@ type appVersions struct {
 	agp        string
 	kotlin     string
 	bom        string
-	compileSdk int // compileSdk for new projects, derived from the BOM
-	live       int // how many of the 4 were fetched live
+	compileSdk string // compileSdk spec for new projects, e.g. "37.2" or "36"
+	live       int    // how many of the 4 were fetched live
 }
 
 var pinnedVersions = appVersions{
@@ -47,25 +47,46 @@ var flutterPinnedVersions = appVersions{
 
 var versionRe = regexp.MustCompile(`^[0-9][0-9A-Za-z.\-+]*$`)
 
-// compileSdkForBom returns the compileSdk a Compose BOM needs.
+// compileSdkForBom returns the compileSdk spec a Compose BOM needs.
 // Known breakpoint: 2026 BOMs (Compose 1.13 / Material 3 1.5 /
-// core-ktx 1.19) require compileSdk 37, while the 2025 BOMs build
-// against 36. When a future BOM needs a newer SDK, add its
-// breakpoint here — `skoll new` then picks it up automatically,
-// and `skoll run` installs that platform (see sdk.go).
-func compileSdkForBom(bom string) int {
+// core-ktx 1.19) need compileSdk 37.1 at least — plain `compileSdk
+// = 37` (platform 37.0) fails their AAR metadata check — so new
+// projects use 37.2, the version the error itself recommends. The
+// 2025 BOMs build against 36. When a future BOM needs a newer SDK,
+// add its breakpoint here — `skoll new` then picks it up
+// automatically, and `skoll run` installs that platform (see sdk.go).
+func compileSdkForBom(bom string) string {
 	if bom >= "2026.01.01" {
-		return 37
+		return "37.2"
 	}
-	return 36
+	return "36"
 }
 
-// fallbackCompileSdk is the compileSdk of the pinned (verified) BOM.
-// sdk.go falls back to it when the latest platform cannot be
+// fallbackCompileSdk is the compileSdk spec of the pinned (verified)
+// BOM. sdk.go falls back to it when the latest platform cannot be
 // installed on the user's machine, instead of leaving a project
 // that can never build.
-func fallbackCompileSdk() int {
+func fallbackCompileSdk() string {
 	return compileSdkForBom(pinnedVersions.bom)
+}
+
+// compileSdkBlock renders the compileSdk statement for the template:
+// the plain `compileSdk = 36` when there is no minor version, or
+// the AGP 9 block form for a minor version:
+//
+//	compileSdk {
+//	    version = release(37) {
+//	        minorApiLevel = 2
+//	    }
+//	}
+//
+// The template line already carries the 4-space indent, so the
+// first line has none and the closing brace has 4 spaces.
+func (v appVersions) compileSdkBlock() string {
+	if i := strings.Index(v.compileSdk, "."); i >= 0 {
+		return fmt.Sprintf("compileSdk {\n        version = release(%s) {\n            minorApiLevel = %s\n        }\n    }", v.compileSdk[:i], v.compileSdk[i+1:])
+	}
+	return "compileSdk = " + v.compileSdk
 }
 
 func resolveLatestVersions() appVersions {
@@ -94,7 +115,7 @@ func resolveLatestVersions() appVersions {
 // describe says which versions will be used, and whether they are
 // live or the offline pinned set.
 func (v appVersions) describe() string {
-	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, Compose BOM %s, compileSdk %d", v.gradle, v.agp, v.kotlin, v.bom, v.compileSdk)
+	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, Compose BOM %s, compileSdk %s", v.gradle, v.agp, v.kotlin, v.bom, v.compileSdk)
 	switch {
 	case v.live == 4:
 		return "Latest versions: " + base
@@ -108,7 +129,7 @@ func (v appVersions) describe() string {
 // describeWithoutBom is describe() without the Compose BOM part,
 // for the empty and library templates, which do not use Compose.
 func (v appVersions) describeWithoutBom() string {
-	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, compileSdk %d", v.gradle, v.agp, v.kotlin, v.compileSdk)
+	base := fmt.Sprintf("Gradle %s, AGP %s, Kotlin %s, compileSdk %s", v.gradle, v.agp, v.kotlin, v.compileSdk)
 	switch {
 	case v.live == 4:
 		return "Latest versions: " + base

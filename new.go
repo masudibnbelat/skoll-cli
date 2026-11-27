@@ -290,7 +290,7 @@ func replacementsFor(name, appID, pkg string, vers appVersions) []struct{ old, n
 		{"{{AgpVersion}}", vers.agp},
 		{"{{KotlinVersion}}", vers.kotlin},
 		{"{{ComposeBomVersion}}", vers.bom},
-		{"{{CompileSdk}}", strconv.Itoa(vers.compileSdk)},
+		{"{{CompileSdkBlock}}", vers.compileSdkBlock()},
 	}
 }
 

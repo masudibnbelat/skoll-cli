@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "3.0.1"
+const version = "3.2.0"
 
 func main() {
 	cleanStaleOldBinary()

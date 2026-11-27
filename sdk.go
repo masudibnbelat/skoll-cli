@@ -17,6 +17,14 @@ import (
 // cmdline-tools 20.0 is downloaded once and sdkmanager installs
 // platform-tools + the platform + build-tools for the project's API
 // level. Nothing here needs Android Studio.
+//
+// A platform is named by its full spec: "36", "37.0" or "37.2".
+// Android now ships minor API releases, and the libraries of the
+// latest Compose BOM (2026.11.01) need compileSdk 37.1 at least —
+// plain `compileSdk = 37` (platform 37.0) fails their AAR metadata
+// check, so new projects use 37.2. The Gradle syntax for that is
+// the compileSdk block (see versions.go compileSdkBlock):
+// compileSdk { version = release(37) { minorApiLevel = 2 } }.
 
 // cmdline-tools 20.0 (build 14742923) is the minimum that understands
 // Android 37. The old pinned tools (build 13114758, labelled 17.0)
@@ -25,8 +33,9 @@ import (
 // 'platforms;android-37'". 20.0 is also the newest classic
 // sdkmanager: it has no `android` binary, so it is not the 23.0 shim
 // that could not reach its repository, and it parses the Major.Minor
-// package names (android-37.0) correctly. The zip exists for all
-// three OSes under the same build number (verified 2026-11-27).
+// package names (android-37.0, android-37.2) correctly. The zip
+// exists for all three OSes under the same build number (verified
+// 2026-11-27).
 const cmdlineToolsBuild = "14742923"
 const cmdlineToolsVersion = "20.0"
 
@@ -76,50 +85,97 @@ func findAndroidSdk() string {
 	return ""
 }
 
-// sdkApiLevel reads the project's compileSdk: app/build.gradle.kts
-// (compileSdk = 36). Flutter projects use flutter.compileSdkVersion,
-// which is 36, so they fall back to 36 too.
-func sdkApiLevel(root string) int {
+// readAppBuildGradle reads the project's app/build.gradle.kts.
+// nil when the file is missing (not a Gradle project, or Flutter).
+func readAppBuildGradle(root string) []byte {
 	for _, name := range []string{
 		filepath.Join("app", "build.gradle.kts"),
 		filepath.Join("app", "build.gradle"),
 	} {
 		if data, err := os.ReadFile(filepath.Join(root, name)); err == nil {
-			if m := regexp.MustCompile(`compileSdk(?:Version)?\s*=?\s*(\d+)`).FindSubmatch(data); m != nil {
-				if n, err := strconv.Atoi(string(m[1])); err == nil && n >= 21 && n <= 40 {
-					return n
-				}
-			}
+			return data
+		}
+	}
+	return nil
+}
+
+// sdkApiLevel reads the project's compileSdk major version:
+// app/build.gradle.kts, either `compileSdk = 36` or the block form
+// `compileSdk { version = release(37) { minorApiLevel = 2 } }`.
+// Flutter projects use flutter.compileSdkVersion, which is 36, so
+// they fall back to 36 too.
+func sdkApiLevel(root string) int {
+	data := readAppBuildGradle(root)
+	if data == nil {
+		return 36
+	}
+	if m := regexp.MustCompile(`release\((\d+)\)`).FindSubmatch(data); m != nil {
+		if n, err := strconv.Atoi(string(m[1])); err == nil && n >= 21 && n <= 40 {
+			return n
+		}
+	}
+	if m := regexp.MustCompile(`compileSdk(?:Version)?\s*=?\s*(\d+)`).FindSubmatch(data); m != nil {
+		if n, err := strconv.Atoi(string(m[1])); err == nil && n >= 21 && n <= 40 {
+			return n
 		}
 	}
 	return 36
 }
 
-// platformPackage is the exact sdkmanager package name for an API
-// level. From API 37 Android publishes platforms with a minor
-// version — platforms;android-37.0, NOT platforms;android-37.
-// Asking for the old name fails with "Failed to find package".
-func platformPackage(api int) string {
-	if api >= 37 {
-		return fmt.Sprintf("platforms;android-%d.0", api)
+// sdkPlatformSpec reads the project's full compileSdk spec, e.g.
+// "37.2" for the block form, "36" for `compileSdk = 36`. "36" when
+// the file has no compileSdk at all.
+func sdkPlatformSpec(root string) string {
+	data := readAppBuildGradle(root)
+	if data == nil {
+		return "36"
 	}
-	return fmt.Sprintf("platforms;android-%d", api)
+	if m := regexp.MustCompile(`release\((\d+)\)`).FindSubmatch(data); m != nil {
+		major := string(m[1])
+		if mm := regexp.MustCompile(`minorApiLevel\s*=\s*(\d+)`).FindSubmatch(data); mm != nil {
+			return major + "." + string(mm[1])
+		}
+		return major
+	}
+	if m := regexp.MustCompile(`compileSdk(?:Version)?\s*=?\s*(\d+)`).FindSubmatch(data); m != nil {
+		return string(m[1])
+	}
+	return "36"
 }
 
-// platformLabel is the short name shown to the user, e.g. android-37.0.
-func platformLabel(api int) string {
-	if api >= 37 {
-		return fmt.Sprintf("android-%d.0", api)
-	}
-	return fmt.Sprintf("android-%d", api)
+// specMajor is the major API number of a spec, e.g. 37 for "37.2".
+func specMajor(spec string) int {
+	n, _ := strconv.Atoi(strings.Split(spec, ".")[0])
+	return n
 }
 
-// platformDirExists reports whether the platform for api is already
-// installed, accepting both android-37 and android-37.0 folders.
-func platformDirExists(dir string, api int) bool {
-	names := []string{fmt.Sprintf("android-%d", api)}
-	if api >= 37 {
-		names = append(names, fmt.Sprintf("android-%d.0", api))
+// buildToolsFor is the build-tools version for a spec: the major
+// number with .0.0 — build-tools do not track platform minors, so
+// 37.2 still uses build-tools 37.0.0.
+func buildToolsFor(spec string) string {
+	return strconv.Itoa(specMajor(spec)) + ".0.0"
+}
+
+// platformPackage is the exact sdkmanager package name for a spec.
+// From API 37 Android publishes platforms with a minor version —
+// platforms;android-37.2, NOT platforms;android-37. Asking for the
+// old name fails with "Failed to find package".
+func platformPackage(spec string) string {
+	return "platforms;android-" + spec
+}
+
+// platformLabel is the short name shown to the user, e.g. android-37.2.
+func platformLabel(spec string) string {
+	return "android-" + spec
+}
+
+// platformDirExists reports whether the platform for spec is already
+// installed. For "37.0" it also accepts the plain android-37 folder
+// (created by the old symlink step).
+func platformDirExists(dir string, spec string) bool {
+	names := []string{"android-" + spec}
+	if spec == "37.0" {
+		names = append(names, "android-37")
 	}
 	for _, n := range names {
 		if st, err := os.Stat(filepath.Join(dir, "platforms", n)); err == nil && st.IsDir() {
@@ -183,7 +239,7 @@ func cmdlineToolsTooOld(sdkDir string) bool {
 }
 
 // ensurePlatformInstalled installs the Android platform (and
-// matching build-tools) for api when it is missing from an
+// matching build-tools) for spec when it is missing from an
 // otherwise existing SDK. It never leaves the user with a dead
 // project: if the latest platform cannot be installed even after
 // upgrading cmdline-tools, the project is downgraded to the last
@@ -191,8 +247,8 @@ func cmdlineToolsTooOld(sdkDir string) bool {
 // installed instead. A no-op when the platform is already there or
 // when there is no sdkmanager to install it with — Gradle then
 // reports the missing platform itself.
-func ensurePlatformInstalled(dir string, api int, root string) {
-	if platformDirExists(dir, api) {
+func ensurePlatformInstalled(dir string, spec string, root string) {
+	if platformDirExists(dir, spec) {
 		linkPlatform37(dir)
 		return
 	}
@@ -200,31 +256,31 @@ func ensurePlatformInstalled(dir string, api int, root string) {
 	if !fileExists(sdkman) {
 		return
 	}
-	stepLine(fmt.Sprintf("Android platform %s not installed — installing it…", platformLabel(api)))
+	stepLine(fmt.Sprintf("Android platform %s not installed — installing it…", platformLabel(spec)))
 	upgraded := false
 	// API 37 needs cmdline-tools 20.0+. Upgrade first when the
 	// installed tools are known to be too old, instead of letting
 	// sdkmanager fail with "Failed to find package".
-	if api >= 37 && cmdlineToolsTooOld(dir) {
+	if specMajor(spec) >= 37 && cmdlineToolsTooOld(dir) {
 		stepLine(fmt.Sprintf("This SDK's cmdline-tools %s is too old to see Android 37 — upgrading to cmdline-tools %s (keeping your installed platforms)…", cmdlineToolsRevision(dir), cmdlineToolsVersion))
 		if err := upgradeCmdlineTools(dir); err != nil {
 			die("could not upgrade cmdline-tools to " + cmdlineToolsVersion + " (" + err.Error() + "). Install Android Studio once yourself, or set ANDROID_HOME to an existing SDK and retry.")
 		}
 		upgraded = true
 	}
-	if err := installPlatformPackages(dir, api); err == nil {
+	if err := installPlatformPackages(dir, spec); err == nil {
 		linkPlatform37(dir)
-		okLine(fmt.Sprintf("Android platform %s ready", platformLabel(api)))
+		okLine(fmt.Sprintf("Android platform %s ready", platformLabel(spec)))
 		return
 	}
 	// First install failed. If the revision could not be read, the
 	// check above could not see old tools — upgrade once and retry.
-	if api >= 37 && !upgraded {
+	if specMajor(spec) >= 37 && !upgraded {
 		stepLine("Platform install failed — the installed cmdline-tools may be too old to see Android 37, upgrading to cmdline-tools " + cmdlineToolsVersion + " and retrying…")
 		if err := upgradeCmdlineTools(dir); err == nil {
-			if err := installPlatformPackages(dir, api); err == nil {
+			if err := installPlatformPackages(dir, spec); err == nil {
 				linkPlatform37(dir)
-				okLine(fmt.Sprintf("Android platform %s ready", platformLabel(api)))
+				okLine(fmt.Sprintf("Android platform %s ready", platformLabel(spec)))
 				return
 			}
 		}
@@ -233,28 +289,30 @@ func ensurePlatformInstalled(dir string, api int, root string) {
 	// back to the verified set instead of dying: downgrade the
 	// project (compileSdk 36 + pinned BOM, Gradle/AGP/Kotlin stay
 	// at the latest versions) and install that platform.
-	if api >= 37 && downgradeProjectToVerified(root) {
+	if specMajor(spec) >= 37 && downgradeProjectToVerified(root) {
 		stepLine(fmt.Sprintf("Android 37 is not installable here, so this project was switched to the last verified set (compileSdk 36, Compose BOM %s) — Gradle, AGP and Kotlin stay at the latest versions.", pinnedVersions.bom))
 		if err := installPlatformPackages(dir, fallbackCompileSdk()); err == nil {
 			okLine("Android platform android-36 ready (fallback set)")
 			return
 		}
 	}
-	die("could not install Android platform " + platformLabel(api) + ". Try it yourself: yes | \"" + sdkman + "\" --sdk_root=\"" + dir + "\" \"" + platformPackage(api) + "\" \"build-tools;" + strconv.Itoa(api) + ".0.0\"")
+	die("could not install Android platform " + platformLabel(spec) + ". Try it yourself: yes | \"" + sdkman + "\" --sdk_root=\"" + dir + "\" \"" + platformPackage(spec) + "\" \"build-tools;" + buildToolsFor(spec) + "\"")
 }
 
 // installPlatformPackages installs one platform + its build-tools
 // with sdkmanager (licenses auto-accepted).
-func installPlatformPackages(dir string, api int) error {
+func installPlatformPackages(dir string, spec string) error {
 	sdkman := sdkmanagerPath(dir)
-	pkgs := []string{platformPackage(api), fmt.Sprintf("build-tools;%d.0.0", api)}
+	pkgs := []string{platformPackage(spec), "build-tools;" + buildToolsFor(spec)}
 	args := append([]string{"--sdk_root=" + dir}, pkgs...)
 	return runSdkmanagerYes(sdkman, args...)
 }
 
 // downgradeProjectToVerified rewrites a generated project to the last
-// verified set: compileSdk 36 and the pinned Compose BOM. It returns
-// true when it changed app/build.gradle.kts.
+// verified set: compileSdk 36 and the pinned Compose BOM. It handles
+// both the plain form (`compileSdk = 37`) and the block form
+// (`compileSdk { version = release(37) { minorApiLevel = 2 } }`).
+// It returns true when it changed app/build.gradle.kts.
 func downgradeProjectToVerified(root string) bool {
 	path := filepath.Join(root, "app", "build.gradle.kts")
 	data, err := os.ReadFile(path)
@@ -262,7 +320,8 @@ func downgradeProjectToVerified(root string) bool {
 		return false
 	}
 	orig := string(data)
-	changed := regexp.MustCompile(`compileSdk\s*=\s*37\b`).ReplaceAllString(orig, "compileSdk = 36")
+	changed := regexp.MustCompile(`(?s)compileSdk\s*\{\s*version\s*=\s*release\(\d+\)\s*\{\s*minorApiLevel\s*=\s*\d+\s*\}\s*\}`).ReplaceAllString(orig, "compileSdk = 36")
+	changed = regexp.MustCompile(`compileSdk\s*=\s*\d+`).ReplaceAllString(changed, "compileSdk = 36")
 	changed = regexp.MustCompile(`androidx\.compose:compose-bom:[0-9.]+`).ReplaceAllString(changed, "androidx.compose:compose-bom:"+pinnedVersions.bom)
 	if changed == orig {
 		return false
@@ -297,7 +356,7 @@ func ensureAndroidSdk(root string) {
 		if cmdlineToolsIsShim(dir) {
 			stepLine("This SDK's cmdline-tools uses the new Android CLI, which cannot reach its repository — replacing it with cmdline-tools " + cmdlineToolsVersion + " (keeping your installed platforms)…")
 			_ = os.RemoveAll(filepath.Join(dir, "cmdline-tools", "latest"))
-			if err := installAndroidSdk(dir, sdkApiLevel(root)); err != nil {
+			if err := installAndroidSdk(dir, sdkPlatformSpec(root)); err != nil {
 				die("could not install the Android SDK (" + err.Error() + "). Install Android Studio once yourself, or set ANDROID_HOME to an existing SDK and retry.")
 			}
 		}
@@ -305,14 +364,14 @@ func ensureAndroidSdk(root string) {
 		// not: a project created with a newer BOM needs a newer
 		// compileSdk, and its platform is installed here instead
 		// of failing later in Gradle.
-		ensurePlatformInstalled(dir, sdkApiLevel(root), root)
+		ensurePlatformInstalled(dir, sdkPlatformSpec(root), root)
 		applySdkEnv(dir)
 		return
 	}
 	dir := defaultSdkDir()
-	api := sdkApiLevel(root)
-	stepLine(fmt.Sprintf("Android SDK not found — installing it once to %s (cmdline-tools + platform-tools + %s + build-tools, ~350 MB)…", dir, platformLabel(api)))
-	if err := installAndroidSdk(dir, api); err != nil {
+	spec := sdkPlatformSpec(root)
+	stepLine(fmt.Sprintf("Android SDK not found — installing it once to %s (cmdline-tools + platform-tools + %s + build-tools, ~350 MB)…", dir, platformLabel(spec)))
+	if err := installAndroidSdk(dir, spec); err != nil {
 		die("could not install the Android SDK (" + err.Error() + "). Install Android Studio once yourself, or set ANDROID_HOME to an existing SDK and retry.")
 	}
 	applySdkEnv(dir)
@@ -395,13 +454,13 @@ func installCmdlineTools(dir string) error {
 // level. 20.0 is pinned on purpose: older tools cannot see Android
 // 37's packages, and 23.0's sdkmanager is only a shim for the new
 // Android CLI, which fails to reach its repository.
-func installAndroidSdk(dir string, api int) error {
+func installAndroidSdk(dir string, spec string) error {
 	if err := installCmdlineTools(dir); err != nil {
 		return err
 	}
 	// sdkmanager installs the packages (licenses auto-accepted).
-	sp := startSpinner(fmt.Sprintf("Installing %s + build-tools + platform-tools", platformPackage(api)))
-	pkgs := []string{"platform-tools", platformPackage(api), fmt.Sprintf("build-tools;%d.0.0", api)}
+	sp := startSpinner(fmt.Sprintf("Installing %s + build-tools + platform-tools", platformPackage(spec)))
+	pkgs := []string{"platform-tools", platformPackage(spec), "build-tools;" + buildToolsFor(spec)}
 	args := append([]string{"--sdk_root=" + dir}, pkgs...)
 	if err := runSdkmanagerYes(sdkmanagerPath(dir), args...); err != nil {
 		sp.stopFail("sdkmanager install failed")

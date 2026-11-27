@@ -27,7 +27,7 @@ val hasReleaseKey = listOf(
 
 android {
     namespace = "{{Package}}"
-    compileSdk = {{CompileSdk}}
+    {{CompileSdkBlock}}
 
     signingConfigs {
         if (hasReleaseKey) {
